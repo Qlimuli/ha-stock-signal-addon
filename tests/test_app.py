@@ -168,6 +168,7 @@ class CycleAndMqttTests(unittest.TestCase):
         main.cycle_status = "idle"
 
     def test_cycle_includes_manually_held_tickers(self):
+        main.latest_signals = {"REMOVED":{"ticker":"REMOVED","signal":"long"}}
         fake_signal = lambda ticker, is_etf=False: {
             "ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0,
             "price": 10, "reasons": [], "is_etf": is_etf
@@ -179,6 +180,7 @@ class CycleAndMqttTests(unittest.TestCase):
             self.assertTrue(main.run_analysis_cycle())
         self.assertEqual({call.args[0] for call in fetch.call_args_list}, {"AAPL", "SPY", "CUSTOM"})
         self.assertTrue(main.latest_signals["CUSTOM"]["is_etf"])
+        self.assertNotIn("REMOVED", main.latest_signals)
         self.assertEqual(main.cycle_status, "idle")
 
     def test_mqtt_topics_are_retained(self):
