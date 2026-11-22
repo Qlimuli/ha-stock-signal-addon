@@ -2,7 +2,7 @@ name: "Stock & ETF Signal Server"
 version: "1.4.0"
 slug: stock_signal
 description: >
-  Professioneller Aktien- und ETF-Signal-Server mit Intraday-Analyse
+  Professioneller Aktien- und ETF-Signal-Server mit Aktien-Intraday- und ETF-Tagesanalyse
   (RSI, MACD, Bollinger, VWAP, Stochastic, ADX, ATR, CCI). Long/Short/Neutral, ETF-Nachkauf,
   Portfolio mit P&L und gewichteten Empfehlungen. Web-GUI, MQTT, REST.
   Scalable Capital: Depot manuell oder via MCP/HA-Integration verknüpfen.
