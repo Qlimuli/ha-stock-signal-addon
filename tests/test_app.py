@@ -183,6 +183,22 @@ class CycleAndMqttTests(unittest.TestCase):
         self.assertNotIn("REMOVED", main.latest_signals)
         self.assertEqual(main.cycle_status, "idle")
 
+    def test_push_only_fires_on_new_qualifying_signal(self):
+        with patch.object(main, "_push_settings_read", return_value={
+            "enabled": True, "notify_long": True, "notify_short": True, "min_confidence": 70
+        }), patch.object(main, "_push_send", return_value=1) as send:
+            main.notify_signal_changes({"AAPL":{"signal":"neutral"}}, {
+                "AAPL":{"signal":"long","confidence":75,"price":100}
+            })
+            main.notify_signal_changes({"MSFT":{"signal":"long"}}, {
+                "MSFT":{"signal":"long","confidence":90,"price":200}
+            })
+            main.notify_signal_changes({"NVDA":{"signal":"neutral"}}, {
+                "NVDA":{"signal":"short","confidence":60,"price":100}
+            })
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args.args[0]["ticker"], "AAPL")
+
     def test_mqtt_v2_reason_code_object_does_not_crash(self):
         reason = Mock(is_failure=False)
         with patch.object(main, "publish_mqtt"):
