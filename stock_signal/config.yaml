@@ -24,7 +24,7 @@ ports_description:
 options:
   tickers: "AAPL,MSFT,NVDA,TSLA"
   etf_tickers: "VWCE.DE,SPY,QQQ,SXR8.DE"
-  update_interval_minutes: 30
+  update_interval_minutes: 5
   mqtt_enabled: true
   mqtt_topic_prefix: "stock_signal"
   rsi_oversold: 30
