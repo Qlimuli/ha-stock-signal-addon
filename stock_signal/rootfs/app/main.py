@@ -129,7 +129,7 @@ def _safe_float(value, default=float("nan")) -> float:
 
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
     if df is None or len(df) < 200:
-        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 Kurskerzen erforderlich)"], "price": None, "is_etf": is_etf}
+        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Kurskerzen (mindestens 200 erforderlich)"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
     price = _safe_float(latest.get("Close"))
     rsi = _safe_float(latest.get("RSI"), 50)
@@ -141,6 +141,8 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     sma50 = _safe_float(latest.get("SMA_50"), price)
     sma200_value = latest.get("SMA_200")
     sma200 = _safe_float(sma200_value) if not pd.isna(sma200_value) else None
+    if sma200 is not None and not np.isfinite(sma200):
+        sma200 = None
     vwap = _safe_float(latest.get("VWAP"), price)
     atr = _safe_float(latest.get("ATR"), 0)
     stoch_k = _safe_float(latest.get("STOCH_K"), 50)
@@ -150,6 +152,7 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     if any(pd.isna(v) for v in [price, rsi, macd, macd_sig, macd_hist, bb_pct, sma20, sma50, vwap, atr, stoch_k, stoch_d, adx, cci]):
         return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Indikatoren noch nicht vollständig verfügbar"], "price": price, "is_etf": is_etf}
     reasons: List[str] = []
+    vwap_label = "20-period VWAP" if df.attrs.get("vwap_type") == "rolling20" else "session VWAP"
     long_score = 0
     short_score = 0
     if rsi <= RSI_OVERSOLD:
@@ -166,10 +169,10 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
         reasons.append(f"RSI elevated ({rsi:.1f})")
     if macd > macd_sig and macd_hist > 0:
         long_score += 20
-        reasons.append("MACD bullish crossover / positive histogram")
+        reasons.append("MACD bullish alignment / positive histogram")
     elif macd < macd_sig and macd_hist < 0:
         short_score += 20
-        reasons.append("MACD bearish crossover / negative histogram")
+        reasons.append("MACD bearish alignment / negative histogram")
     if len(df) > 2:
         prev_hist = float(df.iloc[-2].get("MACD_Hist", 0) or 0)
         if macd_hist > prev_hist and macd_hist > 0:
@@ -194,10 +197,10 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
         reasons.append("Price < SMA20 < SMA50 (downtrend)")
     if price > vwap:
         long_score += 10
-        reasons.append("Price above session VWAP")
+        reasons.append(f"Price above {vwap_label}")
     elif price < vwap:
         short_score += 10
-        reasons.append("Price below session VWAP")
+        reasons.append(f"Price below {vwap_label}")
     if stoch_k < 20 and stoch_k > stoch_d:
         long_score += 8
         reasons.append("Stochastic bullish turn from oversold")
