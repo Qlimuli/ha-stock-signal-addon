@@ -356,7 +356,7 @@ def _portfolio_write(items):
 
 def _portfolio_snapshot():
     holdings = _portfolio_read()
-    rows, total_value, total_cost = [], 0.0, 0.0
+    rows, total_value, total_cost, valued_cost = [], 0.0, 0.0, 0.0
     with state_lock:
         signals = dict(latest_signals)
     for item in holdings:
@@ -365,15 +365,16 @@ def _portfolio_snapshot():
         value = float(price) * qty if price is not None else None
         invested = qty * cost
         pnl = value - invested if value is not None else None
+        total_cost += invested
         if value is not None:
             total_value += value
-            total_cost += invested
+            valued_cost += invested
         rows.append({**item, "price": price, "market_value": round(value, 2) if value is not None else None,
                      "invested": round(invested, 2), "pnl": round(pnl, 2) if pnl is not None else None,
                      "pnl_percent": round(pnl / invested * 100, 2) if pnl is not None and invested else None,
                      "signal": sig.get("signal", "unknown"), "confidence": sig.get("confidence", 0)})
     return {"holdings": rows, "market_value": round(total_value, 2), "invested": round(total_cost, 2),
-            "pnl": round(total_value - total_cost, 2), "last_update": last_update}
+            "pnl": round(total_value - valued_cost, 2), "last_update": last_update}
 
 
 @app.route("/portfolio", methods=["GET", "POST"])
