@@ -1,0 +1,42 @@
+name: "Stock & ETF Signal Server"
+version: "1.0.0"
+slug: stock_signal
+description: >
+  Aktien- und ETF-Signal-Server mit technischer Analyse (yfinance, keine API-Keys).
+  Liefert Long/Short-Signale und ETF-Nachkauf-Empfehlungen.
+  Portfolio-Abfrage über Scalable Capital MCP (separat verbinden).
+url: "https://github.com/Qlimuli/ha-stock-signal-addon"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "REST API & Health"
+options:
+  tickers: "VWCE.DE,SPY,QQQ,AAPL,MSFT,TSLA,BTC-USD"
+  etf_tickers: "VWCE.DE,SPY,QQQ,IE00B4L5Y983.DE"
+  update_interval_minutes: 30
+  mqtt_enabled: true
+  mqtt_topic_prefix: "stock_signal"
+  rsi_oversold: 30
+  rsi_overbought: 70
+  lookback_days: 120
+schema:
+  tickers: str
+  etf_tickers: str
+  update_interval_minutes: int(5,1440)
+  mqtt_enabled: bool
+  mqtt_topic_prefix: str
+  rsi_oversold: int(10,40)
+  rsi_overbought: int(60,90)
+  lookback_days: int(30,365)
+map:
+  - type: share
+    read_only: false
+services:
+  - mqtt:want
