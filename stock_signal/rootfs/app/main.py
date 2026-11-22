@@ -20,9 +20,9 @@ from typing import Dict, List, Any, Optional
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from ta.momentum import RSIIndicator
-from ta.trend import MACD, SMAIndicator, EMAIndicator
-from ta.volatility import BollingerBands
+from ta.momentum import RSIIndicator, StochasticOscillator
+from ta.trend import MACD, SMAIndicator, EMAIndicator, ADXIndicator, CCIIndicator
+from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import OnBalanceVolumeIndicator
 from flask import Flask, jsonify, request, send_from_directory
 import paho.mqtt.client as mqtt
@@ -91,6 +91,19 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["SMA_200"] = SMAIndicator(close=close, window=200).sma_indicator()
     df["EMA_12"] = EMAIndicator(close=close, window=12).ema_indicator()
     df["EMA_26"] = EMAIndicator(close=close, window=26).ema_indicator()
+    high = pd.to_numeric(df["High"], errors="coerce")
+    low = pd.to_numeric(df["Low"], errors="coerce")
+    df["ATR"] = AverageTrueRange(high=high, low=low, close=close, window=14).average_true_range()
+    stoch = StochasticOscillator(high=high, low=low, close=close, window=14, smooth_window=3)
+    df["STOCH_K"] = stoch.stoch()
+    df["STOCH_D"] = stoch.stoch_signal()
+    df["ADX"] = ADXIndicator(high=high, low=low, close=close, window=14).adx()
+    df["CCI"] = CCIIndicator(high=high, low=low, close=close, window=20).cci()
+    typical = (high + low + close) / 3
+    session_key = pd.Series(df.index.date, index=df.index)
+    cumulative_volume = volume.groupby(session_key).cumsum()
+    cumulative_value = (typical * volume).groupby(session_key).cumsum()
+    df["VWAP"] = (cumulative_value / cumulative_volume.replace(0, np.nan)).fillna(typical)
     df["OBV"] = OnBalanceVolumeIndicator(close=close, volume=volume).on_balance_volume()
     df["Volume_Avg20"] = volume.rolling(20, min_periods=5).mean()
     return df
@@ -98,7 +111,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
     if df is None or len(df) < 200:
-        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 x 5 Minuten erforderlich)"], "price": None, "is_etf": is_etf}
+        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 Intraday-Kerzen erforderlich (5m/15m))"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
     price = float(latest["Close"])
     rsi = float(latest.get("RSI", 50) or 50)
@@ -109,7 +122,13 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     sma20 = float(latest.get("SMA_20", price) or price)
     sma50 = float(latest.get("SMA_50", price) or price)
     sma200 = float(latest.get("SMA_200", price) or price) if not pd.isna(latest.get("SMA_200")) else None
-    if any(pd.isna(v) for v in [price, rsi, macd, macd_sig, macd_hist, bb_pct, sma20, sma50]):
+    vwap = float(latest.get("VWAP", price) or price)
+    atr = float(latest.get("ATR", 0) or 0)
+    stoch_k = float(latest.get("STOCH_K", 50) or 50)
+    stoch_d = float(latest.get("STOCH_D", 50) or 50)
+    adx = float(latest.get("ADX", 0) or 0)
+    cci = float(latest.get("CCI", 0) or 0)
+    if any(pd.isna(v) for v in [price, rsi, macd, macd_sig, macd_hist, bb_pct, sma20, sma50, vwap, atr, stoch_k, stoch_d, adx, cci]):
         return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Indikatoren noch nicht vollständig verfügbar"], "price": price, "is_etf": is_etf}
     reasons: List[str] = []
     long_score = 0
@@ -154,13 +173,38 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     elif price < sma20 < sma50:
         short_score += 15
         reasons.append("Price < SMA20 < SMA50 (downtrend)")
+    if price > vwap:
+        long_score += 10
+        reasons.append("Price above session VWAP")
+    elif price < vwap:
+        short_score += 10
+        reasons.append("Price below session VWAP")
+    if stoch_k < 20 and stoch_k > stoch_d:
+        long_score += 8
+        reasons.append("Stochastic bullish turn from oversold")
+    elif stoch_k > 80 and stoch_k < stoch_d:
+        short_score += 8
+        reasons.append("Stochastic bearish turn from overbought")
+    if adx >= 25:
+        if price > sma20 > sma50:
+            long_score += 5
+            reasons.append(f"ADX confirms trend ({adx:.1f})")
+        elif price < sma20 < sma50:
+            short_score += 5
+            reasons.append(f"ADX confirms trend ({adx:.1f})")
+    if cci >= 100:
+        long_score += 5
+        reasons.append(f"CCI bullish momentum ({cci:.0f})")
+    elif cci <= -100:
+        short_score += 5
+        reasons.append(f"CCI bearish momentum ({cci:.0f})")
     if sma200 is not None:
         if price > sma200:
             long_score += 10
-            reasons.append("Above 200-SMA (long-term bullish)")
+            reasons.append("Above 200-period SMA (intraday trend)")
         else:
             short_score += 10
-            reasons.append("Below 200-SMA (long-term bearish)")
+            reasons.append("Below 200-period SMA (intraday trend)")
     if "Volume" in df.columns and len(df) > 20:
         avg_vol = df["Volume"].tail(20).mean()
         if latest["Volume"] > avg_vol * 1.5:
@@ -193,8 +237,12 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
         "long_score": long_score, "short_score": short_score, "reasons": reasons,
         "price": round(price, 4), "rsi": round(rsi, 1), "macd_hist": round(macd_hist, 4),
         "bb_pct": round(bb_pct, 3), "sma20": round(sma20, 4), "sma50": round(sma50, 4),
-        "sma200": round(sma200, 4) if sma200 else None, "is_etf": is_etf,
-        "updated": datetime.now(timezone.utc).isoformat(),
+        "sma200": round(sma200, 4) if sma200 else None, "vwap": round(vwap, 4),
+        "atr": round(atr, 4), "atr_percent": round(atr / price * 100, 2) if price else None,
+        "stoch_k": round(stoch_k, 1), "adx": round(adx, 1), "cci": round(cci, 1),
+        "stop_loss": round(price - 1.5 * atr, 4) if signal == "long" else (round(price + 1.5 * atr, 4) if signal == "short" else None),
+        "target_price": round(price + 2 * atr, 4) if signal == "long" else (round(price - 2 * atr, 4) if signal == "short" else None),
+        "is_etf": is_etf, "updated": datetime.now(timezone.utc).isoformat(),
     }
 
 
