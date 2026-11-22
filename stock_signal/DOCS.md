@@ -2,7 +2,7 @@
 
 ## Daten und Signale
 
-Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Die Strategie verwendet Intraday-Kerzen (primär 5 Minuten, Fallback 15 Minuten) statt Tageskerzen und ist damit auf kurze Beobachtungs- und Haltedauern ausgelegt. VWAP wird je Handelstag zurückgesetzt. Die ATR-Marken dienen nur als technische Orientierung und werden nicht als Order ausgeführt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
+Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Aktien werden mit 5-Minuten-Kerzen (Fallback 15 Minuten) für kurze Haltedauern analysiert. ETFs werden bewusst mit Tageskerzen bewertet, damit DCA-/Nachkaufkandidaten nicht aus kurzfristigem 5-Minuten-Rauschen entstehen. VWAP wird je Handelstag zurückgesetzt. Die ATR-Marken dienen nur als technische Orientierung und werden nicht als Order ausgeführt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
 
 Technische Indikatoren:
 - RSI (14)
