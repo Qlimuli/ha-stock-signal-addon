@@ -111,7 +111,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
     if df is None or len(df) < 200:
-        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 Intraday-Kerzen erforderlich (5m/15m))"], "price": None, "is_etf": is_etf}
+        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 Kurskerzen erforderlich)"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
     price = float(latest["Close"])
     rsi = float(latest.get("RSI", 50) or 50)
@@ -201,10 +201,10 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     if sma200 is not None:
         if price > sma200:
             long_score += 10
-            reasons.append("Above 200-period SMA (intraday trend)")
+            reasons.append("Above 200-period SMA (trend filter)")
         else:
             short_score += 10
-            reasons.append("Below 200-period SMA (intraday trend)")
+            reasons.append("Below 200-period SMA (trend filter)")
     if "Volume" in df.columns and len(df) > 20:
         avg_vol = df["Volume"].tail(20).mean()
         if latest["Volume"] > avg_vol * 1.5:
@@ -249,15 +249,21 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
 def fetch_and_analyze(ticker: str, is_etf: bool = False) -> Optional[Dict[str, Any]]:
     try:
         t = yf.Ticker(ticker)
-        # The strategy targets short holding periods: use 5-minute candles, not daily bars.
-        df = t.history(period="5d", interval="5m", auto_adjust=True, prepost=False, timeout=20)
-        interval = "5m"
+        if is_etf:
+            # DCA / ETF valuation uses daily bars; intraday noise is not a meaningful dip signal.
+            period = "2y" if LOOKBACK_DAYS > 180 else "1y"
+            df = t.history(period=period, interval="1d", auto_adjust=True, timeout=20)
+            interval = "1d"
+        else:
+            # The stock strategy targets short holding periods: use 5-minute candles.
+            df = t.history(period="5d", interval="5m", auto_adjust=True, prepost=False, timeout=20)
+            interval = "5m"
+            if df.empty or len(df) < 200:
+                # Fallback when Yahoo returns too few 5-minute candles.
+                df = t.history(period="60d", interval="15m", auto_adjust=True, prepost=False, timeout=20)
+                interval = "15m"
         if df.empty or len(df) < 200:
-            # Fallback when Yahoo returns too few 5-minute candles.
-            df = t.history(period="60d", interval="15m", auto_adjust=True, prepost=False, timeout=20)
-            interval = "15m"
-        if df.empty or len(df) < 200:
-            log.warning("No/insufficient intraday data for %s (%d candles)", ticker, len(df))
+            log.warning("No/insufficient %s data for %s (%d candles)", interval, ticker, len(df))
             return None
         df = compute_indicators(df)
         result = generate_signal(ticker, df, is_etf=is_etf)
