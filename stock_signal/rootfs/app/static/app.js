@@ -1,7 +1,9 @@
 (() => {
   "use strict";
 
-  const API = "";
+  // Relative base so HA Ingress (/api/hassio_ingress/<token>/) works.
+  // Leading-slash paths would resolve against the HA host root and 404.
+  const API = ".";
 
   let allSignals = {};
   let etfOpps = [];
