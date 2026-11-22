@@ -163,22 +163,22 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
     short_score = 0
     if rsi <= RSI_OVERSOLD:
         long_score += 25
-        reasons.append(f"RSI oversold ({rsi:.1f})")
+        reasons.append(f"RSI im überverkauften Bereich ({rsi:.1f})")
     elif rsi >= RSI_OVERBOUGHT:
         short_score += 25
-        reasons.append(f"RSI overbought ({rsi:.1f})")
+        reasons.append(f"RSI im überkauften Bereich ({rsi:.1f})")
     elif rsi < 40:
         long_score += 10
-        reasons.append(f"RSI low ({rsi:.1f})")
+        reasons.append(f"RSI niedrig ({rsi:.1f})")
     elif rsi > 60:
         short_score += 10
-        reasons.append(f"RSI elevated ({rsi:.1f})")
+        reasons.append(f"RSI erhöht ({rsi:.1f})")
     if macd > macd_sig and macd_hist > 0:
         long_score += 20
-        reasons.append("MACD bullish alignment / positive histogram")
+        reasons.append("MACD bestätigt Aufwärtsmomentum")
     elif macd < macd_sig and macd_hist < 0:
         short_score += 20
-        reasons.append("MACD bearish alignment / negative histogram")
+        reasons.append("MACD bestätigt Abwärtsmomentum")
     if len(df) > 2:
         prev_hist = float(df.iloc[-2].get("MACD_Hist", 0) or 0)
         if macd_hist > prev_hist and macd_hist > 0:
@@ -187,65 +187,65 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
             short_score += 8
     if bb_pct <= 0.05:
         long_score += 20
-        reasons.append(f"Price near lower Bollinger ({bb_pct*100:.0f}%)")
+        reasons.append(f"Kurs nahe unterem Bollinger-Band ({bb_pct*100:.0f}%)")
     elif bb_pct >= 0.95:
         short_score += 20
-        reasons.append(f"Price near upper Bollinger ({bb_pct*100:.0f}%)")
+        reasons.append(f"Kurs nahe oberem Bollinger-Band ({bb_pct*100:.0f}%)")
     elif bb_pct < 0.25:
         long_score += 8
     elif bb_pct > 0.75:
         short_score += 8
     if price > sma20 > sma50:
         long_score += 15
-        reasons.append("Price > SMA20 > SMA50 (uptrend)")
+        reasons.append("Kurs über SMA 20 und SMA 50 (Aufwärtstrend)")
     elif price < sma20 < sma50:
         short_score += 15
-        reasons.append("Price < SMA20 < SMA50 (downtrend)")
+        reasons.append("Kurs unter SMA 20 und SMA 50 (Abwärtstrend)")
     if price > vwap:
         long_score += 10
-        reasons.append(f"Price above {vwap_label}")
+        reasons.append(f"Kurs über {vwap_label}")
     elif price < vwap:
         short_score += 10
-        reasons.append(f"Price below {vwap_label}")
+        reasons.append(f"Kurs unter {vwap_label}")
     if stoch_k < 20 and stoch_k > stoch_d:
         long_score += 8
-        reasons.append("Stochastic bullish turn from oversold")
+        reasons.append("Stochastik dreht aus überverkauftem Bereich nach oben")
     elif stoch_k > 80 and stoch_k < stoch_d:
         short_score += 8
-        reasons.append("Stochastic bearish turn from overbought")
+        reasons.append("Stochastik dreht aus überkauftem Bereich nach unten")
     if adx >= 25:
         if price > sma20 > sma50:
             long_score += 5
-            reasons.append(f"ADX confirms trend ({adx:.1f})")
+            reasons.append(f"ADX bestätigt Trendstärke ({adx:.1f})")
         elif price < sma20 < sma50:
             short_score += 5
-            reasons.append(f"ADX confirms trend ({adx:.1f})")
+            reasons.append(f"ADX bestätigt Trendstärke ({adx:.1f})")
     if cci >= 100:
         long_score += 5
-        reasons.append(f"CCI bullish momentum ({cci:.0f})")
+        reasons.append(f"CCI zeigt positives Momentum ({cci:.0f})")
     elif cci <= -100:
         short_score += 5
-        reasons.append(f"CCI bearish momentum ({cci:.0f})")
+        reasons.append(f"CCI zeigt negatives Momentum ({cci:.0f})")
     if sma200 is not None:
         if price > sma200:
             long_score += 10
-            reasons.append("Above 200-period SMA (trend filter)")
+            reasons.append("Über der 200-Perioden-Linie (Trendfilter)")
         else:
             short_score += 10
-            reasons.append("Below 200-period SMA (trend filter)")
+            reasons.append("Unter der 200-Perioden-Linie (Trendfilter)")
     if "Volume" in df.columns and len(df) > 20:
         avg_vol = df["Volume"].tail(20).mean()
         if latest["Volume"] > avg_vol * 1.5:
             if long_score > short_score:
                 long_score += 7
-                reasons.append("High volume confirmation")
+                reasons.append("Erhöhtes Handelsvolumen bestätigt Bewegung")
             elif short_score > long_score:
                 short_score += 7
-                reasons.append("High volume confirmation")
+                reasons.append("Erhöhtes Handelsvolumen bestätigt Bewegung")
     if is_etf:
         if rsi < 40 or bb_pct < 0.3 or (sma200 and price < sma200 * 0.98):
             long_score += 15
-            reasons.append("ETF dip opportunity (DCA-friendly)")
+            reasons.append("ETF-Rücksetzer: möglicher gestaffelter Einstieg")
         short_score = int(short_score * 0.6)
     net = long_score - short_score
     if net >= 28:
