@@ -89,7 +89,7 @@
         <div class="rec">${esc(o.recommendation || "Guter Zeitpunkt zum Nachkaufen")}</div>
         <div class="meta">
           <span>Stärke ${o.strength}</span>
-          <span>Confidence ${o.confidence ?? 0}%</span>
+          <span>Signalqualität ${o.confidence ?? 0}%</span>
           <span>RSI ${o.rsi ?? "—"}</span>
           <span>${o.price != null ? formatPrice(o.price) : ""}</span>
         </div>
@@ -183,7 +183,7 @@
       }));
       const recs = await api("/recommendations");
       $("#pfRecs").innerHTML = (recs.recommendations || []).map(h =>
-        `<div class="rec-item"><strong>${esc(h.ticker)}</strong> · ${esc(h.signal)} · Confidence ${h.confidence}% · P&L ${h.pnl_percent ?? "—"}%</div>`
+        `<div class="rec-item"><strong>${esc(h.ticker)}</strong> · ${esc(h.signal)} · Signalqualität ${h.confidence}% · P&L ${h.pnl_percent ?? "—"}%</div>`
       ).join("") || '<div class="empty">Noch keine Empfehlungen.</div>';
       renderDashboardRecommendations(recs.recommendations || []);
     } catch (e) {
@@ -198,7 +198,7 @@
     const rows = (recommendations && recommendations.length ? recommendations : Object.values(allSignals).filter(s => s.signal !== "neutral"))
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0)).slice(0, 5);
     target.innerHTML = rows.length ? rows.slice(0, 5).map(s =>
-      `<div class="rec-item"><strong>${esc(s.ticker)}</strong> · ${esc(s.signal)} · Stärke ${s.strength ?? 0} · Confidence ${s.confidence ?? 0}%</div>`
+      `<div class="rec-item"><strong>${esc(s.ticker)}</strong> · ${esc(s.signal)} · Stärke ${s.strength ?? 0} · Signalqualität ${s.confidence ?? 0}%</div>`
     ).join("") : '<div class="empty">Noch keine klaren Signale.</div>';
     const sum = $("#sumRec");
     if (sum) sum.textContent = rows.length;
@@ -222,7 +222,7 @@
     out.textContent = "Analysiere…";
     try {
       const result = await api("/analyze", { method: "POST", body: JSON.stringify({ ticker, is_etf }) });
-      out.innerHTML = `<div class="signal-card ${esc(result.signal)}"><strong>${esc(result.ticker)} · ${esc(result.signal)}</strong><p>Kurs ${result.price == null ? "—" : formatPrice(result.price)} · Stärke ${result.strength} · Confidence ${result.confidence ?? 0}%</p><p>${esc((result.reasons || []).join(" · "))}</p></div>`;
+      out.innerHTML = `<div class="signal-card ${esc(result.signal)}"><strong>${esc(result.ticker)} · ${esc(result.signal)}</strong><p>Kurs ${result.price == null ? "—" : formatPrice(result.price)} · Stärke ${result.strength} · Signalqualität ${result.confidence ?? 0}%</p><p>${esc((result.reasons || []).join(" · "))}</p></div>`;
     } catch (e) { out.textContent = e.message; }
   }
 
@@ -240,7 +240,7 @@
 
         <div class="metric-grid">
           <div class="metric"><div class="m-label">Kurs</div><div class="m-value">${s.price != null ? formatPrice(s.price) : "—"}</div></div>
-          <div class="metric"><div class="m-label">Confidence (heuristisch)</div><div class="m-value">${s.confidence ?? 0}%</div></div>
+          <div class="metric"><div class="m-label">Signalqualität (heuristisch)</div><div class="m-value">${s.confidence ?? 0}%</div></div>
           <div class="metric"><div class="m-label">RSI</div><div class="m-value">${s.rsi ?? "—"}</div></div>
           <div class="metric"><div class="m-label">MACD Hist</div><div class="m-value">${s.macd_hist ?? "—"}</div></div>
           <div class="metric"><div class="m-label">BB %</div><div class="m-value">${s.bb_pct != null ? (s.bb_pct * 100).toFixed(0) + "%" : "—"}</div></div>
@@ -279,8 +279,8 @@
       const pair = await Promise.all([api("/push/settings"), api("/health")]);
       const p = pair[0], s = pair[1];
       $("#pushEnabled").checked = !!p.enabled; $("#pushLong").checked = !!p.notify_long;
-      $("#pushShort").checked = !!p.notify_short; $("#pushConfidence").value = p.min_confidence;
-      $("#pushConfidenceValue").textContent = p.min_confidence + " %";
+      $("#pushShort").checked = !!p.notify_short; $("#pushSignalqualität").value = p.min_confidence;
+      $("#pushSignalqualitätValue").textContent = p.min_confidence + " %";
       $("#pushHelp").textContent = p.subscriptions + " registrierte(s) Gerät(e).";
       $("#pushStatus").textContent = p.subscriptions ? "Gerät registriert" : "Nicht eingerichtet";
       $("#systemStatus").innerHTML = '<div class="status-line"><span>Analysezyklus</span><strong>' + esc(s.cycle_status) + '</strong></div><div class="status-line"><span>Signale</span><strong>' + (s.signal_count || 0) + '</strong></div><div class="status-line"><span>MQTT</span><strong class="' + (s.mqtt_connected ? 'status-ok' : 'status-error') + '">' + (s.mqtt_enabled ? (s.mqtt_connected ? 'Verbunden' : 'Nicht verbunden') : 'Deaktiviert') + '</strong></div><div class="status-line"><span>Letztes Update</span><strong>' + formatTimestamp(s.last_update) + '</strong></div>';
@@ -304,7 +304,7 @@
     try {
       await api("/push/settings", { method: "POST", body: JSON.stringify({
         enabled: $("#pushEnabled").checked, notify_long: $("#pushLong").checked,
-        notify_short: $("#pushShort").checked, min_confidence: Number($("#pushConfidence").value)
+        notify_short: $("#pushShort").checked, min_confidence: Number($("#pushSignalqualität").value)
       })});
       await loadSettings(); $("#pushHelp").textContent = "Einstellungen gespeichert.";
     } catch(e) { alert(e.message); }
@@ -347,7 +347,7 @@
   $("#btnEnablePush").addEventListener("click", enablePush);
   $("#btnSavePush").addEventListener("click", savePushSettings);
   $("#btnTestPush").addEventListener("click", testPush);
-  $("#pushConfidence").addEventListener("input", e => $("#pushConfidenceValue").textContent = e.target.value + " %");
+  $("#pushSignalqualität").addEventListener("input", e => $("#pushSignalqualitätValue").textContent = e.target.value + " %");
   $("#btnCopyMcp").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("#scalableMcpUrl").value); $("#btnCopyMcp").textContent = "Kopiert"; } catch (_) { $("#scalableMcpUrl").select(); document.execCommand("copy"); } });
   $$(".tab").forEach(tab => tab.addEventListener("click", () => showPanel(tab.dataset.tab)));
   $("#btnAddHolding").addEventListener("click", openHoldingModal);
