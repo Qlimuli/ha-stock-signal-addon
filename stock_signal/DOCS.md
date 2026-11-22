@@ -1,8 +1,8 @@
-# Stock & ETF Signal Server – Dokumentation (v1.3)
+# Stock & ETF Signal Server – Dokumentation (v1.4)
 
 ## Daten und Signale
 
-Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert.
+Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Die Strategie verwendet Intraday-Kerzen (primär 5 Minuten, Fallback 15 Minuten) statt Tageskerzen und ist damit auf kurze Beobachtungs- und Haltedauern ausgelegt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
 
 Technische Indikatoren:
 - RSI (14)
@@ -15,13 +15,14 @@ Long-/Short-Scores werden aus mehreren Indikatorgruppen gebildet. Ein Signal ent
 
 ## Portfolio
 
-Das Portfolio wird persistent unter `/data/portfolio.json` gespeichert.
+Das Portfolio wird persistent unter `/data/portfolio.json` gespeichert. Beschädigte JSON-Dateien werden nicht stillschweigend als leeres Depot überschrieben. Für nicht bepreiste Positionen werden Marktwert und P&L je Position als nicht verfügbar ausgewiesen; die Depotübersicht meldet die Anzahl solcher Positionen.
 
 - `GET /portfolio` – Positionen, Marktwert und Gewinn/Verlust
 - `POST /portfolio` – gesamtes Portfolio als JSON-Array ersetzen
 - `POST /portfolio/holding` – Position hinzufügen/ersetzen
 - `DELETE /portfolio/holding/<TICKER>` – Position löschen
 - `GET /recommendations` – Positionen nach Signal-Confidence sortiert
+- Portfolio-Antworten enthalten zusätzlich `unpriced_count` und `valued_invested`, damit fehlende Kursdaten nicht mit Nullwerten verwechselt werden.
 
 Ein Portfolio-Eintrag benötigt `ticker`, `quantity` und `avg_cost`; optional sind `name` und `is_etf`.
 
