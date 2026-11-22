@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Stock & ETF Signals</title>
+  <title>Stock & ETF Signals Pro</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,8 +12,8 @@
       <div class="header-left">
         <div class="logo">📈</div>
         <div>
-          <h1>Stock & ETF Signals</h1>
-          <p class="subtitle">Technische Analyse · Long / Short · ETF-Nachkauf</p>
+          <h1>Stock & ETF Signals <span class="ver">Pro</span></h1>
+          <p class="subtitle">Multi-Faktor TA · Portfolio · Nachkauf</p>
         </div>
       </div>
       <div class="header-right">
@@ -24,34 +24,34 @@
       </div>
     </header>
 
-    <!-- Summary cards -->
-    <section class="summary" id="summary">
-      <div class="card summary-card">
-        <div class="label">Signale</div>
-        <div class="value" id="sumTickers">—</div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="signals">Signale</button>
+      <button class="tab" data-tab="portfolio">Portfolio</button>
+      <button class="tab" data-tab="analyze">Analyse</button>
+    </nav>
+
+    <section class="panel active" id="panel-dashboard">
+      <div class="summary" id="summary">
+        <div class="card summary-card"><div class="label">Signale</div><div class="value" id="sumTickers">—</div></div>
+        <div class="card summary-card long"><div class="label">Long</div><div class="value" id="sumLong">—</div></div>
+        <div class="card summary-card short"><div class="label">Short</div><div class="value" id="sumShort">—</div></div>
+        <div class="card summary-card etf"><div class="label">ETF-Chancen</div><div class="value" id="sumEtf">—</div></div>
+        <div class="card summary-card rec"><div class="label">Nachkauf prio</div><div class="value" id="sumRec">—</div></div>
       </div>
-      <div class="card summary-card long">
-        <div class="label">Long</div>
-        <div class="value" id="sumLong">—</div>
-      </div>
-      <div class="card summary-card short">
-        <div class="label">Short</div>
-        <div class="value" id="sumShort">—</div>
-      </div>
-      <div class="card summary-card etf">
-        <div class="label">ETF-Chancen</div>
-        <div class="value" id="sumEtf">—</div>
-      </div>
+
+      <section class="section" id="etfSection" style="display:none">
+        <h2>🎯 ETF-Nachkauf-Empfehlungen</h2>
+        <div class="etf-grid" id="etfGrid"></div>
+      </section>
+
+      <section class="section">
+        <h2>⭐ Top-Empfehlungen (Depot + Signale)</h2>
+        <div class="rec-list" id="dashRecs"><div class="empty">Lade…</div></div>
+      </section>
     </section>
 
-    <!-- ETF Opportunities -->
-    <section class="section" id="etfSection" style="display:none">
-      <h2>🎯 ETF-Nachkauf-Empfehlungen</h2>
-      <div class="etf-grid" id="etfGrid"></div>
-    </section>
-
-    <!-- All signals -->
-    <section class="section">
+    <section class="panel" id="panel-signals">
       <div class="section-header">
         <h2>Alle Signale</h2>
         <div class="filters">
@@ -67,18 +67,86 @@
       </div>
     </section>
 
+    <section class="panel" id="panel-portfolio">
+      <div class="portfolio-header">
+        <div>
+          <h2>Dein Depot</h2>
+          <p class="muted">Manuell gepflegt oder aus Scalable exportiert. Wird mit Live-Signalen für Nachkauf kombiniert.</p>
+        </div>
+        <div class="pf-totals" id="pfTotals">—</div>
+      </div>
+
+      <div class="scalable-box">
+        <strong>Scalable Capital</strong>
+        <p>Offizieller MCP (<code>https://mcp.scalable.capital/mcp</code>) läuft in AI-Clients (Grok/Claude) mit OAuth — nicht direkt im Add-on-Container.</p>
+        <ul>
+          <li>In Scalable Web: Profil → Sicherheit → <em>Agentic Investing</em> aktivieren (Read-only empfohlen)</li>
+          <li>Hier: Holdings manuell eintragen oder JSON importieren</li>
+          <li>Optional: HACS-Integration <em>Scalable Capital</em> für HA-Sensoren</li>
+        </ul>
+      </div>
+
+      <div class="pf-actions">
+        <button class="btn btn-secondary" id="btnAddHolding">+ Position</button>
+        <button class="btn btn-secondary" id="btnImportJson">JSON import</button>
+        <button class="btn btn-secondary" id="btnExportJson">Export</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="pf-table" id="pfTable">
+          <thead>
+            <tr>
+              <th>Ticker</th><th>Stück</th><th>Ø-Kurs</th><th>Live</th><th>Wert</th><th>P&amp;L</th><th>Signal</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pfBody"></tbody>
+        </table>
+      </div>
+
+      <section class="section">
+        <h2>Nachkauf-Prioritäten</h2>
+        <div class="rec-list" id="pfRecs"><div class="empty">Noch keine Daten</div></div>
+      </section>
+    </section>
+
+    <section class="panel" id="panel-analyze">
+      <h2>On-Demand Analyse</h2>
+      <p class="muted">Beliebigen Ticker prüfen (Yahoo-Symbol, z.&nbsp;B. <code>NVDA</code>, <code>ASML.AS</code>, <code>VWCE.DE</code>).</p>
+      <form class="analyze-form" id="analyzeForm">
+        <input type="text" id="analyzeTicker" placeholder="Ticker" autocomplete="off" required />
+        <label class="check"><input type="checkbox" id="analyzeEtf" /> als ETF behandeln</label>
+        <button type="submit" class="btn btn-primary">Analysieren</button>
+      </form>
+      <div id="analyzeResult" class="analyze-result"></div>
+    </section>
+
     <footer class="footer">
-      <span>Keine Finanzberatung · Nur technische Analyse</span>
+      <span>Keine Finanzberatung · Nur technische Analyse · v1.2</span>
       <span id="apiStatus" class="status">●</span>
     </footer>
   </div>
 
-  <!-- Detail Modal -->
   <div class="modal" id="modal" hidden>
     <div class="modal-backdrop" id="modalClose"></div>
     <div class="modal-content">
       <button class="modal-x" id="modalX">×</button>
       <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="holdModal" hidden>
+    <div class="modal-backdrop" id="holdClose"></div>
+    <div class="modal-content">
+      <button class="modal-x" id="holdX">×</button>
+      <h3 style="margin-bottom:12px">Position hinzufügen / ändern</h3>
+      <form id="holdForm" class="hold-form">
+        <label>Ticker <input name="ticker" required placeholder="VWCE.DE" /></label>
+        <label>Name <input name="name" placeholder="optional" /></label>
+        <label>Stück <input name="quantity" type="number" step="any" required /></label>
+        <label>Ø Einstand <input name="avg_cost" type="number" step="any" required /></label>
+        <label class="check"><input name="is_etf" type="checkbox" /> ETF</label>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+      </form>
     </div>
   </div>
 
