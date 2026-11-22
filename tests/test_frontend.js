@@ -35,8 +35,8 @@ const one = selector => {
   if (!selectors.has(selector)) selectors.set(selector, new Element());
   return selectors.get(selector);
 };
-const tabs = ["dashboard", "signals", "portfolio", "analyze"].map(x => new Element({tab:x}));
-const panels = ["dashboard", "signals", "portfolio", "analyze"].map(x => {
+const tabs = ["dashboard", "signals", "portfolio", "analyze", "settings"].map(x => new Element({tab:x}));
+const panels = ["dashboard", "signals", "portfolio", "analyze", "settings"].map(x => {
   const el = new Element(); el.id = "panel-" + x; return el;
 });
 const chips = ["all", "long", "short", "neutral", "etf"].map(x => new Element({filter:x}));
@@ -56,7 +56,7 @@ async function fetch(url) {
   return {ok:true, status:200, json:async()=>data};
 }
 const context = {
-  document, fetch, console, setInterval:()=>0,
+  document, fetch, console, navigator:{}, setInterval:()=>0,
   setTimeout:fn=>{fn();return 0;},
   FormData: class { entries(){return [];} has(){return false;} },
   Blob: class {}, URL:{createObjectURL:()=>"",revokeObjectURL(){}},
