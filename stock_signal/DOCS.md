@@ -1,4 +1,4 @@
-# Stock & ETF Signal Server – Dokumentation (v1.4)
+# Stock & ETF Signal Server – Dokumentation (v1.5)
 
 ## Daten und Signale
 
@@ -50,3 +50,10 @@ MQTT-Nachrichten werden retained veröffentlicht. Der Client verwendet asynchron
 ## Hinweis
 
 Die Anwendung ist ein technisches Analysewerkzeug und keine Anlageberatung. Yahoo-Finance-Daten können verzögert, unvollständig oder zeitweise nicht verfügbar sein. Vor jeder Transaktion Daten und Risiken selbst prüfen.
+
+## Push-Benachrichtigungen
+Web Push verwendet persistente VAPID-Schlüssel. Geräte können in der GUI unter Einstellungen registriert werden. Benachrichtigungen werden bei einem Wechsel zu Long oder Short und ab der eingestellten Mindest-Confidence versendet. HTTPS und Browser-Berechtigung sind erforderlich. Private Schlüssel und Abonnements werden unter /data gespeichert; abgelaufene Abonnements werden entfernt.
+API: GET/POST /push/settings, GET /push/public-key, POST /push/subscribe und POST /push/test.
+
+## Scalable Capital MCP
+Scalable MCP ist ein Remote-MCP-Server für kompatible KI-Clients, keine lokale Broker-API. Die GUI stellt Serveradresse und Einrichtungsanleitung bereit. OAuth und 2FA erfolgen im unterstützten KI-Client. Das Add-on speichert keine Scalable-Zugangsdaten und behauptet keine direkte MCP-Verbindung. Depotdaten können als JSON importiert werden.
