@@ -1,4 +1,4 @@
-# Stock & ETF Signal Server – Dokumentation (v1.5)
+# Stock & ETF Signal Server – Dokumentation (v1.5.1)
 
 ## Daten und Signale
 
