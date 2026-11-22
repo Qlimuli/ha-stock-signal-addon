@@ -116,25 +116,37 @@ def compute_indicators(df: pd.DataFrame, session_vwap: bool = True) -> pd.DataFr
     return df
 
 
+def _safe_float(value, default=float("nan")) -> float:
+    """Convert scalar indicator values without treating valid zeroes as missing."""
+    try:
+        if value is None or pd.isna(value):
+            return float(default)
+        result = float(value)
+        return result if np.isfinite(result) else float(default)
+    except (TypeError, ValueError):
+        return float(default)
+
+
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
     if df is None or len(df) < 200:
         return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 Kurskerzen erforderlich)"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
-    price = float(latest["Close"])
-    rsi = float(latest.get("RSI", 50) or 50)
-    macd = float(latest.get("MACD", 0) or 0)
-    macd_sig = float(latest.get("MACD_Signal", 0) or 0)
-    macd_hist = float(latest.get("MACD_Hist", 0) or 0)
-    bb_pct = float(latest.get("BB_Pct", 0.5) or 0.5)
-    sma20 = float(latest.get("SMA_20", price) or price)
-    sma50 = float(latest.get("SMA_50", price) or price)
-    sma200 = float(latest.get("SMA_200", price) or price) if not pd.isna(latest.get("SMA_200")) else None
-    vwap = float(latest.get("VWAP", price) or price)
-    atr = float(latest.get("ATR", 0) or 0)
-    stoch_k = float(latest.get("STOCH_K", 50) or 50)
-    stoch_d = float(latest.get("STOCH_D", 50) or 50)
-    adx = float(latest.get("ADX", 0) or 0)
-    cci = float(latest.get("CCI", 0) or 0)
+    price = _safe_float(latest.get("Close"))
+    rsi = _safe_float(latest.get("RSI"), 50)
+    macd = _safe_float(latest.get("MACD"), 0)
+    macd_sig = _safe_float(latest.get("MACD_Signal"), 0)
+    macd_hist = _safe_float(latest.get("MACD_Hist"), 0)
+    bb_pct = _safe_float(latest.get("BB_Pct"), 0.5)
+    sma20 = _safe_float(latest.get("SMA_20"), price)
+    sma50 = _safe_float(latest.get("SMA_50"), price)
+    sma200_value = latest.get("SMA_200")
+    sma200 = _safe_float(sma200_value) if not pd.isna(sma200_value) else None
+    vwap = _safe_float(latest.get("VWAP"), price)
+    atr = _safe_float(latest.get("ATR"), 0)
+    stoch_k = _safe_float(latest.get("STOCH_K"), 50)
+    stoch_d = _safe_float(latest.get("STOCH_D"), 50)
+    adx = _safe_float(latest.get("ADX"), 0)
+    cci = _safe_float(latest.get("CCI"), 0)
     if any(pd.isna(v) for v in [price, rsi, macd, macd_sig, macd_hist, bb_pct, sma20, sma50, vwap, atr, stoch_k, stoch_d, adx, cci]):
         return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Indikatoren noch nicht vollständig verfügbar"], "price": price, "is_etf": is_etf}
     reasons: List[str] = []
@@ -238,7 +250,7 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
         strength = max(0, 50 - abs(net))
     reasons = list(dict.fromkeys(reasons))[:6]
     return {
-        "ticker": ticker, "signal": signal, "strength": int(min(100, abs(net))),
+        "ticker": ticker, "signal": signal, "strength": int(strength),
         "confidence": int(min(95, 35 + abs(net) * 0.55)) if signal != "neutral" else int(max(0, 35 - abs(net) * 0.5)),
         "confidence_type": "heuristic_score_not_probability", "data_sufficient": True,
         "long_score": long_score, "short_score": short_score, "reasons": reasons,
