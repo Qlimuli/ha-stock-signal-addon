@@ -2,14 +2,15 @@
 
 ## Daten und Signale
 
-Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Die Strategie verwendet Intraday-Kerzen (primär 5 Minuten, Fallback 15 Minuten) statt Tageskerzen und ist damit auf kurze Beobachtungs- und Haltedauern ausgelegt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
+Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Die Strategie verwendet Intraday-Kerzen (primär 5 Minuten, Fallback 15 Minuten) statt Tageskerzen und ist damit auf kurze Beobachtungs- und Haltedauern ausgelegt. VWAP wird je Handelstag zurückgesetzt. Die ATR-Marken dienen nur als technische Orientierung und werden nicht als Order ausgeführt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
 
 Technische Indikatoren:
 - RSI (14)
 - MACD (12/26/9)
 - Bollinger-Bänder (20, 2)
 - SMA 20 / 50 / 200 und EMA 12 / 26
-- Volumen und 20-Tage-Volumenmittel
+- Session-VWAP, Stochastic %K/%D, ADX, CCI, ATR und 20-Kerzen-Volumenmittel
+- ATR-basierte Orientierungsmarken: Stop-Loss bei 1,5 × ATR und Kursziel bei 2 × ATR (keine garantierten Kursmarken)
 
 Long-/Short-Scores werden aus mehreren Indikatorgruppen gebildet. Ein Signal entsteht ab einer Netto-Differenz von 28 Punkten. **Confidence ist ein heuristischer Übereinstimmungswert, keine statistische Wahrscheinlichkeit.** Bei zu wenigen oder unvollständigen Daten wird kein belastbares Signal ausgegeben. Fehlgeschlagene Aktualisierungen löschen nicht den letzten gültigen Kursstand.
 
