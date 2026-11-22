@@ -183,6 +183,24 @@ class CycleAndMqttTests(unittest.TestCase):
         self.assertNotIn("REMOVED", main.latest_signals)
         self.assertEqual(main.cycle_status, "idle")
 
+    def test_mqtt_v2_reason_code_object_does_not_crash(self):
+        reason = Mock(is_failure=False)
+        with patch.object(main, "publish_mqtt"):
+            main._mqtt_on_connect(None, None, None, reason, None)
+        self.assertTrue(main.mqtt_connected)
+        main.mqtt_connected = False
+
+    def test_push_settings_validation_and_subscription(self):
+        with tempfile.TemporaryDirectory() as folder:
+            main.PUSH_SETTINGS_FILE = Path(folder) / "push_settings.json"
+            main.PUSH_SUBSCRIPTIONS_FILE = Path(folder) / "push_subscriptions.json"
+            client = main.app.test_client()
+            self.assertEqual(client.post("/push/settings", json={"min_confidence": 120}).status_code, 400)
+            self.assertEqual(client.post("/push/settings", json={"enabled": False, "min_confidence": 70}).status_code, 200)
+            self.assertFalse(client.get("/push/settings").get_json()["enabled"])
+            self.assertEqual(client.post("/push/subscribe", json={"endpoint":"https://push.example/sub","keys":{"p256dh":"key","auth":"auth"}}).status_code, 201)
+            self.assertEqual(client.get("/push/settings").get_json()["subscriptions"], 1)
+
     def test_mqtt_topics_are_retained(self):
         fake = Mock()
         main.mqtt_client = fake
