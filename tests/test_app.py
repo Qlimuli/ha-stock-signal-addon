@@ -49,6 +49,16 @@ class SignalEngineTests(unittest.TestCase):
         self.assertFalse(result["data_sufficient"])
         self.assertEqual(result["signal"], "neutral")
 
+    def test_zero_indicator_values_are_preserved(self):
+        df = main.compute_indicators(self.make_prices())
+        df.iloc[-1, df.columns.get_loc("RSI")] = 0
+        df.iloc[-1, df.columns.get_loc("BB_Pct")] = 0
+        df.iloc[-1, df.columns.get_loc("STOCH_K")] = 0
+        result = main.generate_signal("TEST", df)
+        self.assertEqual(result["rsi"], 0)
+        self.assertEqual(result["bb_pct"], 0)
+        self.assertEqual(result["stoch_k"], 0)
+
     def test_fetch_uses_intraday_and_fallback(self):
         ticker = Mock()
         ticker.history.side_effect = [self.make_prices(120), self.make_prices(260)]
