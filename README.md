@@ -7,7 +7,7 @@ Ein Home-Assistant-Add-on für technische Aktien- und ETF-Analyse mit REST-API, 
 | Bereich | Funktion |
 |---|---|
 | Signale | Long / Short / Neutral mit Stärke und heuristischem Confidence-Wert |
-| Indikatoren | RSI, MACD, Bollinger-Bänder, SMA 20/50/200, EMA 12/26 und Volumen |
+| Indikatoren | RSI, MACD, Bollinger-Bänder, SMA/EMA, Session-VWAP, Stochastic, ADX, CCI, ATR und Volumen |
 | ETFs | ETF-Kandidaten für weitere Prüfung / DCA-Beobachtung |
 | Portfolio | Positionen speichern, Marktwert und P&L berechnen, Empfehlungen anzeigen |
 | Dashboard | Dashboard, Signale, Portfolio und On-Demand-Analyse |
