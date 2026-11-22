@@ -200,8 +200,8 @@
   }
 
   function showPanel(name) {
-    $(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === name));
-    $(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
+    $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === name));
+    $$(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
     if (name === "portfolio") loadPortfolio();
   }
 
@@ -278,7 +278,7 @@
   }
 
   $("#btnRefresh").addEventListener("click", forceRefresh);
-  $(".tab").forEach(tab => tab.addEventListener("click", () => showPanel(tab.dataset.tab)));
+  $$(".tab").forEach(tab => tab.addEventListener("click", () => showPanel(tab.dataset.tab)));
   $("#btnAddHolding").addEventListener("click", openHoldingModal);
   $("#holdClose").addEventListener("click", closeHoldingModal);
   $("#holdX").addEventListener("click", closeHoldingModal);
