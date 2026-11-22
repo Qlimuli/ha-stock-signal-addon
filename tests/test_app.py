@@ -110,8 +110,20 @@ class ApiAndPortfolioTests(unittest.TestCase):
 
     def test_analyze_endpoint_validation_and_result(self):
         self.assertEqual(self.client.post("/analyze", json={}).status_code, 400)
+        self.assertEqual(self.client.post("/analyze", json=[]).status_code, 400)
         with patch.object(main, "fetch_and_analyze", return_value={"ticker":"AAPL","signal":"neutral"}):
             self.assertEqual(self.client.post("/analyze", json={"ticker":"AAPL"}).status_code, 200)
+        self.assertIn("AAPL", main.latest_signals)
+
+    def test_single_signal_endpoint_caches_new_analysis(self):
+        with patch.object(main, "fetch_and_analyze", return_value={"ticker":"MSFT","signal":"long"}):
+            response = self.client.get("/signal/MSFT")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("MSFT", main.latest_signals)
+
+    def test_static_dashboard_and_etf_endpoint(self):
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(self.client.get("/etf_opportunities").status_code, 200)
 
     def test_refresh_reports_existing_cycle(self):
         main.cycle_lock.acquire()
