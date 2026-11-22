@@ -44,6 +44,9 @@
         if (data.cycle_status !== "running") break;
       }
       await loadSignals();
+    } catch (e) {
+      console.error("Refresh failed:", e);
+      alert("Aktualisierung fehlgeschlagen: " + e.message);
     } finally {
       btn.classList.remove("loading");
       btn.innerHTML = `<span class="icon">↻</span> Aktualisieren`;
@@ -294,12 +297,12 @@
   $("#btnExportJson").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(portfolioData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = "stock-signal-portfolio.json"; a.click(); URL.revokeObjectURL(url);
+    a.href = url; a.download = "stock-signal-portfolio.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   $("#btnImportJson").addEventListener("click", () => {
     const input = document.createElement("input"); input.type = "file"; input.accept = "application/json";
     input.onchange = async () => {
-      try { const parsed = JSON.parse(await input.files[0].text()); if (!Array.isArray(parsed)) throw new Error("JSON muss ein Array sein"); await api("/portfolio", { method: "POST", body: JSON.stringify(parsed) }); await loadPortfolio(); }
+      try { if (!input.files || !input.files[0]) return; const parsed = JSON.parse(await input.files[0].text()); if (!Array.isArray(parsed)) throw new Error("JSON muss ein Array sein"); await api("/portfolio", { method: "POST", body: JSON.stringify(parsed) }); await loadPortfolio(); }
       catch (e) { alert(e.message); }
     }; input.click();
   });
