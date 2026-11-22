@@ -2,7 +2,7 @@
 
 ## Daten und Signale
 
-Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Aktien werden mit 5-Minuten-Kerzen (Fallback 15 Minuten) für kurze Haltedauern analysiert. ETFs werden bewusst mit Tageskerzen bewertet, damit DCA-/Nachkaufkandidaten nicht aus kurzfristigem 5-Minuten-Rauschen entstehen. VWAP wird je Handelstag zurückgesetzt. Die ATR-Marken dienen nur als technische Orientierung und werden nicht als Order ausgeführt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
+Kursdaten werden ohne API-Key über Yahoo Finance (yfinance) geladen. Aktien und ETFs werden über die Add-on-Optionen getrennt konfiguriert. Aktien werden mit 5-Minuten-Kerzen (Fallback 15 Minuten) für kurze Haltedauern analysiert. ETFs werden bewusst mit Tageskerzen bewertet, damit DCA-/Nachkaufkandidaten nicht aus kurzfristigem 5-Minuten-Rauschen entstehen. VWAP wird bei Aktien je Handelstag zurückgesetzt; bei ETFs wird ein rollierender 20-Tage-VWAP verwendet. Die ATR-Marken dienen nur als technische Orientierung und werden nicht als Order ausgeführt. Yahoo kann Daten verzögert liefern oder Intraday-Daten zeitweise nicht bereitstellen.
 
 Technische Indikatoren:
 - RSI (14)
