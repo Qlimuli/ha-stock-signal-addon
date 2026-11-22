@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Stock & ETF Signals Pro</title>
-  <link rel="stylesheet" href="style.css?v=1.4.0" />
+  <link rel="stylesheet" href="style.css?v=1.5.0" />
 </head>
 <body>
   <div class="app">
@@ -29,6 +29,7 @@
       <button class="tab" data-tab="signals">Signale</button>
       <button class="tab" data-tab="portfolio">Portfolio</button>
       <button class="tab" data-tab="analyze">Analyse</button>
+      <button class="tab" data-tab="settings">Einstellungen</button>
     </nav>
 
     <section class="panel active" id="panel-dashboard">
@@ -77,13 +78,12 @@
       </div>
 
       <div class="scalable-box">
-        <strong>Scalable Capital</strong>
-        <p>Offizieller MCP (<code>https://mcp.scalable.capital/mcp</code>) läuft in AI-Clients (Grok/Claude) mit OAuth — nicht direkt im Add-on-Container.</p>
-        <ul>
-          <li>In Scalable Web: Profil → Sicherheit → <em>Agentic Investing</em> aktivieren (Read-only empfohlen)</li>
-          <li>Hier: Holdings manuell eintragen oder JSON importieren</li>
-          <li>Optional: HACS-Integration <em>Scalable Capital</em> für HA-Sensoren</li>
-        </ul>
+        <div class="settings-title"><strong>Scalable Capital · MCP-Verbindung</strong><span class="status">Externe Autorisierung</span></div>
+        <p>Scalable stellt einen Remote-MCP-Server für kompatible KI-Clients bereit. Die Anmeldung erfolgt dort über Scalable und Zwei-Faktor-Authentifizierung; das Add-on übernimmt keine Scalable-Zugangsdaten.</p>
+        <label class="field-label" for="scalableMcpUrl">Offizielle MCP-Serveradresse</label>
+        <div class="inline-form"><input id="scalableMcpUrl" type="url" readonly value="https://mcp.scalable.capital/mcp"><button class="btn btn-secondary" id="btnCopyMcp">Adresse kopieren</button></div>
+        <div class="pf-actions"><a class="btn btn-secondary" href="https://help.scalable.capital/de/agentic-investing-aac939f8/wie-richte-ich-den-scalable-mcp-ein-bea177f8" target="_blank" rel="noopener">Einrichtungsanleitung</a><a class="btn btn-secondary" href="https://de.scalable.capital/agentic-investing" target="_blank" rel="noopener">Scalable Agentic Investing</a></div>
+        <p class="small-note">Die Adresse wird in einem unterstützten KI-Client als MCP-Server eingetragen. Das Add-on kann den OAuth-Login nicht selbst durchführen. Depotdaten können hier als JSON importiert werden.</p>
       </div>
 
       <div class="pf-actions">
@@ -120,8 +120,22 @@
       <div id="analyzeResult" class="analyze-result"></div>
     </section>
 
+<section class="panel" id="panel-settings">
+      <section class="section"><h2>Push-Benachrichtigungen</h2>
+        <p class="muted">Meldet neue Long- und Short-Signale auch dann, wenn das Dashboard geschlossen ist. Erfordert HTTPS und Browser-Berechtigung.</p>
+        <div class="settings-card">
+          <div class="settings-row"><div><strong>Dieses Gerät registrieren</strong><div class="small-note">Push-Benachrichtigungen auf diesem Browser aktivieren.</div></div><button class="btn btn-primary" id="btnEnablePush">Push aktivieren</button></div>
+          <div class="settings-row"><label class="check"><input type="checkbox" id="pushEnabled" checked> Push global aktiv</label><span id="pushStatus" class="status">Nicht eingerichtet</span></div>
+          <div class="settings-row"><label class="check"><input type="checkbox" id="pushLong" checked> Long</label><label class="check"><input type="checkbox" id="pushShort" checked> Short</label></div>
+          <div class="settings-row"><label for="pushConfidence">Mindest-Confidence</label><div class="range-control"><input id="pushConfidence" type="range" min="0" max="95" step="5" value="65"><strong id="pushConfidenceValue">65 %</strong></div></div>
+          <div class="pf-actions"><button class="btn btn-secondary" id="btnSavePush">Einstellungen speichern</button><button class="btn btn-secondary" id="btnTestPush">Test senden</button></div>
+          <p class="small-note" id="pushHelp">Noch kein Gerät registriert.</p>
+        </div>
+      </section>
+      <section class="section"><h2>Systemstatus</h2><div class="settings-card" id="systemStatus">Status wird geladen …</div></section>
+    </section>
     <footer class="footer">
-      <span>Keine Finanzberatung · Nur technische Analyse · v1.4</span>
+      <span>Keine Finanzberatung · Nur technische Analyse · v1.5</span>
       <span id="apiStatus" class="status">●</span>
     </footer>
   </div>
@@ -150,6 +164,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=1.4.0"></script>
+  <script src="app.js?v=1.5.0"></script>
 </body>
 </html>
