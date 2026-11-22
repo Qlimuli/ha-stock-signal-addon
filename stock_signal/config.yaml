@@ -1,5 +1,5 @@
 name: "Stock & ETF Signal Server"
-version: "1.1.0"
+version: "1.1.1"
 slug: stock_signal
 description: >
   Aktien- und ETF-Signal-Server mit technischer Analyse (yfinance, keine API-Keys).
@@ -24,7 +24,7 @@ ports_description:
   8099/tcp: "REST API & GUI (via Ingress)"
 options:
   tickers: "VWCE.DE,SPY,QQQ,AAPL,MSFT,TSLA,BTC-USD"
-  etf_tickers: "VWCE.DE,SPY,QQQ,IE00B4L5Y983.DE"
+  etf_tickers: "VWCE.DE,SPY,QQQ,SXR8.DE"
   update_interval_minutes: 30
   mqtt_enabled: true
   mqtt_topic_prefix: "stock_signal"
