@@ -88,8 +88,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
-    if df is None or len(df) < 30:
-        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Kursdaten (mindestens 30 Handelstage erforderlich)"], "price": None, "is_etf": is_etf}
+    if df is None or len(df) < 50:
+        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Kursdaten (mindestens 50 Handelstage erforderlich)"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
     price = float(latest["Close"])
     rsi = float(latest.get("RSI", 50) or 50)
