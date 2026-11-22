@@ -86,6 +86,7 @@
         <div class="rec">${esc(o.recommendation || "Guter Zeitpunkt zum Nachkaufen")}</div>
         <div class="meta">
           <span>Stärke ${o.strength}</span>
+          <span>Confidence ${o.confidence ?? 0}%</span>
           <span>RSI ${o.rsi ?? "—"}</span>
           <span>${o.price != null ? formatPrice(o.price) : ""}</span>
         </div>
@@ -133,7 +134,7 @@
             <div class="strength-bar">
               <div class="strength-fill ${s.signal}" style="width:${Math.min(100, s.strength || 0)}%"></div>
             </div>
-            <span class="strength-val">${s.strength ?? 0}</span>
+            <span class="strength-val">${s.strength ?? 0} · C ${s.confidence ?? 0}%</span>
           </div>
           <div class="reasons">${esc(reasons)}</div>
         </div>
@@ -233,6 +234,7 @@
 
         <div class="metric-grid">
           <div class="metric"><div class="m-label">Kurs</div><div class="m-value">${s.price != null ? formatPrice(s.price) : "—"}</div></div>
+          <div class="metric"><div class="m-label">Confidence (heuristisch)</div><div class="m-value">${s.confidence ?? 0}%</div></div>
           <div class="metric"><div class="m-label">RSI</div><div class="m-value">${s.rsi ?? "—"}</div></div>
           <div class="metric"><div class="m-label">MACD Hist</div><div class="m-value">${s.macd_hist ?? "—"}</div></div>
           <div class="metric"><div class="m-label">BB %</div><div class="m-value">${s.bb_pct != null ? (s.bb_pct * 100).toFixed(0) + "%" : "—"}</div></div>
