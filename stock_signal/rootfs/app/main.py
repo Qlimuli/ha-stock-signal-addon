@@ -455,7 +455,7 @@ def _push_keys():
         key = serialization.load_pem_private_key(pem, password=None)
         point = key.public_key().public_numbers()
         public = b"\x04" + point.x.to_bytes(32, "big") + point.y.to_bytes(32, "big")
-        return pem.decode("ascii"), _b64url(public)
+        return str(VAPID_PRIVATE_FILE), _b64url(public)
 
 
 def _push_subscriptions_read():
