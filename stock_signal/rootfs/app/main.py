@@ -61,7 +61,7 @@ mqtt_client: Optional[mqtt.Client] = None
 mqtt_connected = False
 
 
-def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def compute_indicators(df: pd.DataFrame, session_vwap: bool = True) -> pd.DataFrame:
     """Calculate indicators on chronologically ordered, single-symbol OHLCV data."""
     df = df.copy()
     if isinstance(df.columns, pd.MultiIndex):
@@ -100,10 +100,17 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["ADX"] = ADXIndicator(high=high, low=low, close=close, window=14).adx()
     df["CCI"] = CCIIndicator(high=high, low=low, close=close, window=20).cci()
     typical = (high + low + close) / 3
-    session_key = pd.Series(df.index.date, index=df.index)
-    cumulative_volume = volume.groupby(session_key).cumsum()
-    cumulative_value = (typical * volume).groupby(session_key).cumsum()
-    df["VWAP"] = (cumulative_value / cumulative_volume.replace(0, np.nan)).fillna(typical)
+    if session_vwap:
+        session_key = pd.Series(df.index.date, index=df.index)
+        cumulative_volume = volume.groupby(session_key).cumsum()
+        cumulative_value = (typical * volume).groupby(session_key).cumsum()
+        df["VWAP"] = (cumulative_value / cumulative_volume.replace(0, np.nan)).fillna(typical)
+        df.attrs["vwap_type"] = "session"
+    else:
+        rolling_volume = volume.rolling(20, min_periods=5).sum()
+        rolling_value = (typical * volume).rolling(20, min_periods=5).sum()
+        df["VWAP"] = (rolling_value / rolling_volume.replace(0, np.nan)).fillna(typical)
+        df.attrs["vwap_type"] = "rolling20"
     df["OBV"] = OnBalanceVolumeIndicator(close=close, volume=volume).on_balance_volume()
     df["Volume_Avg20"] = volume.rolling(20, min_periods=5).mean()
     return df
@@ -265,8 +272,9 @@ def fetch_and_analyze(ticker: str, is_etf: bool = False) -> Optional[Dict[str, A
         if df.empty or len(df) < 200:
             log.warning("No/insufficient %s data for %s (%d candles)", interval, ticker, len(df))
             return None
-        df = compute_indicators(df)
+        df = compute_indicators(df, session_vwap=not is_etf)
         result = generate_signal(ticker, df, is_etf=is_etf)
+        result["vwap_type"] = df.attrs.get("vwap_type", "session")
         result["interval"] = interval
         result["market_data_time"] = df.index[-1].isoformat()
         return result
