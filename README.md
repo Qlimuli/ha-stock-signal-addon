@@ -21,7 +21,7 @@ Ein Home-Assistant-Add-on für technische Aktien- und ETF-Analyse mit REST-API, 
 2. Repositories → `https://github.com/Qlimuli/ha-stock-signal-addon`
 3. **Stock & ETF Signal Server** installieren und starten.
 
-Nach dem Update auf Version 1.3.0 Add-on neu starten. Ticker, Intervall und MQTT können über die Add-on-Optionen angepasst werden.
+Nach dem Update auf Version 1.4.0 Add-on neu starten. Ticker, Intervall und MQTT können über die Add-on-Optionen angepasst werden.
 
 ## Portfolio
 
