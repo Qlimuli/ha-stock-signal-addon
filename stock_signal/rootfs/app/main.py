@@ -58,6 +58,7 @@ latest_signals: Dict[str, Any] = {}
 latest_etf_opportunities: List[Dict[str, Any]] = []
 last_update: Optional[str] = None
 mqtt_client: Optional[mqtt.Client] = None
+mqtt_connected = False
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -270,44 +271,76 @@ def run_analysis_cycle():
 
 
 def publish_mqtt():
-    if not mqtt_client:
+    if not mqtt_client or not mqtt_connected:
+        log.debug("MQTT publish skipped: broker is not connected")
         return
     try:
+        with state_lock:
+            signals = dict(latest_signals)
+            opportunities = list(latest_etf_opportunities)
+            updated = last_update
         payload = {
-            "last_update": last_update, "ticker_count": len(latest_signals),
-            "etf_opportunities": len(latest_etf_opportunities),
-            "long_count": sum(1 for s in latest_signals.values() if s["signal"] == "long"),
-            "short_count": sum(1 for s in latest_signals.values() if s["signal"] == "short"),
+            "last_update": updated, "ticker_count": len(signals),
+            "etf_opportunities": len(opportunities),
+            "long_count": sum(1 for s in signals.values() if s.get("signal") == "long"),
+            "short_count": sum(1 for s in signals.values() if s.get("signal") == "short"),
         }
-        mqtt_client.publish(f"{MQTT_PREFIX}/summary", json.dumps(payload), retain=True)
-        for ticker, sig in latest_signals.items():
+        messages = [(f"{MQTT_PREFIX}/summary", json.dumps(payload))]
+        for ticker, sig in signals.items():
             topic = f"{MQTT_PREFIX}/{ticker.replace('.', '_')}"
-            mqtt_client.publish(topic, json.dumps(sig), retain=True)
-            mqtt_client.publish(f"{topic}/signal", sig["signal"], retain=True)
-            mqtt_client.publish(f"{topic}/strength", str(sig["strength"]), retain=True)
-            mqtt_client.publish(f"{topic}/confidence", str(sig.get("confidence", 0)), retain=True)
-        mqtt_client.publish(f"{MQTT_PREFIX}/etf_opportunities", json.dumps(latest_etf_opportunities), retain=True)
-        log.info("MQTT publish complete")
+            messages.extend([
+                (topic, json.dumps(sig)),
+                (f"{topic}/signal", sig.get("signal", "neutral")),
+                (f"{topic}/strength", str(sig.get("strength", 0))),
+                (f"{topic}/confidence", str(sig.get("confidence", 0))),
+            ])
+        messages.append((f"{MQTT_PREFIX}/etf_opportunities", json.dumps(opportunities)))
+        for topic, value in messages:
+            info = mqtt_client.publish(topic, value, retain=True)
+            if getattr(info, "rc", 0) != mqtt.MQTT_ERR_SUCCESS:
+                log.warning("MQTT publish rejected for %s (rc=%s)", topic, getattr(info, "rc", "unknown"))
+        log.info("MQTT publish queued: %d messages", len(messages))
     except Exception as e:
-        log.error(f"MQTT publish failed: {e}")
+        log.exception("MQTT publish failed: %s", e)
+
+
+def _mqtt_on_connect(client, userdata, flags, reason_code, properties):
+    global mqtt_connected
+    mqtt_connected = int(reason_code) == 0
+    if mqtt_connected:
+        log.info("MQTT connected to %s:%s", MQTT_HOST, MQTT_PORT)
+        publish_mqtt()
+    else:
+        log.error("MQTT broker rejected connection: %s", reason_code)
+
+
+def _mqtt_on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
+    global mqtt_connected
+    mqtt_connected = False
+    log.warning("MQTT disconnected (reason=%s)", reason_code)
 
 
 def mqtt_connect():
-    global mqtt_client
+    global mqtt_client, mqtt_connected
     if not MQTT_ENABLED:
+        mqtt_connected = False
         return
     try:
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ha_stock_signal")
         if MQTT_USER:
             client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
         client.reconnect_delay_set(min_delay=2, max_delay=60)
+        client.on_connect = _mqtt_on_connect
+        client.on_disconnect = _mqtt_on_disconnect
+        mqtt_client = client
+        mqtt_connected = False
         client.connect_async(MQTT_HOST, MQTT_PORT, 60)
         client.loop_start()
-        mqtt_client = client
-        log.info(f"MQTT connected to {MQTT_HOST}:{MQTT_PORT}")
+        log.info("MQTT connection attempt started for %s:%s", MQTT_HOST, MQTT_PORT)
     except Exception as e:
-        log.error(f"MQTT connect failed: {e}")
+        log.exception("MQTT connect failed: %s", e)
         mqtt_client = None
+        mqtt_connected = False
 
 
 @app.route("/")
@@ -318,7 +351,7 @@ def index():
 @app.route("/health")
 def health():
     with state_lock:
-        return jsonify({"status": "ok", "last_update": last_update, "cycle_status": cycle_status, "signal_count": len(latest_signals), "mqtt_enabled": MQTT_ENABLED})
+        return jsonify({"status": "ok", "last_update": last_update, "cycle_status": cycle_status, "signal_count": len(latest_signals), "mqtt_enabled": MQTT_ENABLED, "mqtt_connected": mqtt_connected})
 
 
 @app.route("/refresh", methods=["POST"])
