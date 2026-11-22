@@ -246,7 +246,7 @@
           <div class="metric"><div class="m-label">SMA 20</div><div class="m-value">${s.sma20 != null ? formatPrice(s.sma20) : "—"}</div></div>
           <div class="metric"><div class="m-label">SMA 50</div><div class="m-value">${s.sma50 != null ? formatPrice(s.sma50) : "—"}</div></div>
           <div class="metric"><div class="m-label">SMA 200</div><div class="m-value">${s.sma200 != null ? formatPrice(s.sma200) : "—"}</div></div>
-          <div class="metric"><div class="m-label">Session VWAP</div><div class="m-value">${s.vwap != null ? formatPrice(s.vwap) : "—"}</div></div>
+          <div class="metric"><div class="m-label">${s.vwap_type === "rolling20" ? "20-Tage-VWAP" : "Session VWAP"}</div><div class="m-value">${s.vwap != null ? formatPrice(s.vwap) : "—"}</div></div>
           <div class="metric"><div class="m-label">ATR / Volatilität</div><div class="m-value">${s.atr != null ? formatPrice(s.atr) + " (" + (s.atr_percent ?? "—") + "%)" : "—"}</div></div>
           <div class="metric"><div class="m-label">Stochastic %K</div><div class="m-value">${s.stoch_k ?? "—"}</div></div>
           <div class="metric"><div class="m-label">ADX</div><div class="m-value">${s.adx ?? "—"}</div></div>
