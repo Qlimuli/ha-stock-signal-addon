@@ -3,7 +3,6 @@ set -e
 
 bashio::log.info "Starting Stock & ETF Signal Server..."
 
-# Read options
 TICKERS=$(bashio::config 'tickers')
 ETF_TICKERS=$(bashio::config 'etf_tickers')
 INTERVAL=$(bashio::config 'update_interval_minutes')
@@ -21,8 +20,8 @@ export MQTT_TOPIC_PREFIX="$MQTT_PREFIX"
 export RSI_OVERSOLD="$RSI_OVERSOLD"
 export RSI_OVERBOUGHT="$RSI_OVERBOUGHT"
 export LOOKBACK_DAYS="$LOOKBACK"
+export DATA_DIR="/data"
 
-# MQTT host from supervisor if available
 if bashio::services.available "mqtt"; then
   export MQTT_HOST=$(bashio::services "mqtt" "host")
   export MQTT_PORT=$(bashio::services "mqtt" "port")
