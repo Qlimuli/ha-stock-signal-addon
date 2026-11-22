@@ -208,6 +208,7 @@
     $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === name));
     $$(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
     if (name === "portfolio") loadPortfolio();
+    if (name === "settings") loadSettings();
   }
 
   function openHoldingModal() { $("#holdModal").hidden = false; }
@@ -267,6 +268,52 @@
     $("#modal").hidden = true;
   }
 
+
+  function b64Bytes(s) {
+    const p = "=".repeat((4 - s.length % 4) % 4);
+    const raw = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(Array.from(raw).map(c => c.charCodeAt(0)));
+  }
+  async function loadSettings() {
+    try {
+      const pair = await Promise.all([api("/push/settings"), api("/health")]);
+      const p = pair[0], s = pair[1];
+      $("#pushEnabled").checked = !!p.enabled; $("#pushLong").checked = !!p.notify_long;
+      $("#pushShort").checked = !!p.notify_short; $("#pushConfidence").value = p.min_confidence;
+      $("#pushConfidenceValue").textContent = p.min_confidence + " %";
+      $("#pushHelp").textContent = p.subscriptions + " registrierte(s) Gerät(e).";
+      $("#pushStatus").textContent = p.subscriptions ? "Gerät registriert" : "Nicht eingerichtet";
+      $("#systemStatus").innerHTML = '<div class="status-line"><span>Analysezyklus</span><strong>' + esc(s.cycle_status) + '</strong></div><div class="status-line"><span>Signale</span><strong>' + (s.signal_count || 0) + '</strong></div><div class="status-line"><span>MQTT</span><strong class="' + (s.mqtt_connected ? 'status-ok' : 'status-error') + '">' + (s.mqtt_enabled ? (s.mqtt_connected ? 'Verbunden' : 'Nicht verbunden') : 'Deaktiviert') + '</strong></div><div class="status-line"><span>Letztes Update</span><strong>' + formatTimestamp(s.last_update) + '</strong></div>';
+    } catch(e) { $("#pushStatus").textContent = "Nicht verfügbar"; $("#systemStatus").textContent = e.message; }
+  }
+  async function enablePush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) { alert("Dieser Browser unterstützt Web Push nicht."); return; }
+    if (!window.isSecureContext) { alert("Push benötigt HTTPS. Bitte über Home Assistant Ingress öffnen."); return; }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Benachrichtigungsberechtigung nicht erteilt.");
+      const registration = await navigator.serviceWorker.register("./sw.js");
+      const key = await api("/push/public-key");
+      let sub = await registration.pushManager.getSubscription();
+      if (!sub) sub = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64Bytes(key.publicKey) });
+      await api("/push/subscribe", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+      await loadSettings(); alert("Dieses Gerät ist für Push registriert.");
+    } catch(e) { console.error(e); alert("Push konnte nicht aktiviert werden: " + e.message); }
+  }
+  async function savePushSettings() {
+    try {
+      await api("/push/settings", { method: "POST", body: JSON.stringify({
+        enabled: $("#pushEnabled").checked, notify_long: $("#pushLong").checked,
+        notify_short: $("#pushShort").checked, min_confidence: Number($("#pushConfidence").value)
+      })});
+      await loadSettings(); $("#pushHelp").textContent = "Einstellungen gespeichert.";
+    } catch(e) { alert(e.message); }
+  }
+  async function testPush() {
+    try { const r = await api("/push/test", { method: "POST" }); $("#pushHelp").textContent = "Test an " + r.devices + " Gerät(e) gesendet."; }
+    catch(e) { alert(e.message); }
+  }
+
   function formatTimestamp(value) {
     if (!value) return "—";
     const date = new Date(value);
@@ -297,6 +344,11 @@
   }
 
   $("#btnRefresh").addEventListener("click", forceRefresh);
+  $("#btnEnablePush").addEventListener("click", enablePush);
+  $("#btnSavePush").addEventListener("click", savePushSettings);
+  $("#btnTestPush").addEventListener("click", testPush);
+  $("#pushConfidence").addEventListener("input", e => $("#pushConfidenceValue").textContent = e.target.value + " %");
+  $("#btnCopyMcp").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("#scalableMcpUrl").value); $("#btnCopyMcp").textContent = "Kopiert"; } catch (_) { $("#scalableMcpUrl").select(); document.execCommand("copy"); } });
   $$(".tab").forEach(tab => tab.addEventListener("click", () => showPanel(tab.dataset.tab)));
   $("#btnAddHolding").addEventListener("click", openHoldingModal);
   $("#holdClose").addEventListener("click", closeHoldingModal);
@@ -336,6 +388,7 @@
     });
   });
 
+  if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("./sw.js").catch(e => console.warn("Service worker:", e));
   loadSignals();
   setInterval(loadSignals, 60000);
 })();
