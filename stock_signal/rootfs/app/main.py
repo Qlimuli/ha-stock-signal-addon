@@ -63,7 +63,7 @@ mqtt_connected = False
 PUSH_SUBSCRIPTIONS_FILE = DATA_DIR / "push_subscriptions.json"
 PUSH_SETTINGS_FILE = DATA_DIR / "push_settings.json"
 VAPID_PRIVATE_FILE = DATA_DIR / "vapid_private.pem"
-VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:admin@localhost")
+VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "https://github.com/Qlimuli/ha-stock-signal-addon")
 push_lock = threading.RLock()
 
 
