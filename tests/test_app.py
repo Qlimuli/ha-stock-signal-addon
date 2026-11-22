@@ -24,13 +24,18 @@ class SignalEngineTests(unittest.TestCase):
 
     def test_indicator_pipeline_and_signal_contract(self):
         df = main.compute_indicators(self.make_prices())
-        for column in ("RSI", "MACD", "MACD_Signal", "BB_Pct", "SMA_20", "SMA_50", "SMA_200", "EMA_12", "EMA_26", "OBV", "Volume_Avg20"):
+        for column in ("RSI", "MACD", "MACD_Signal", "BB_Pct", "SMA_20", "SMA_50", "SMA_200", "EMA_12", "EMA_26", "VWAP", "ATR", "STOCH_K", "STOCH_D", "ADX", "CCI", "OBV", "Volume_Avg20"):
             self.assertIn(column, df.columns)
         result = main.generate_signal("TEST", df)
         self.assertIn(result["signal"], ("long", "short", "neutral"))
         self.assertTrue(0 <= result["confidence"] <= 95)
         self.assertEqual(result["confidence_type"], "heuristic_score_not_probability")
         self.assertTrue(result["data_sufficient"])
+        self.assertIsNotNone(result["vwap"])
+        self.assertGreaterEqual(result["atr"], 0)
+        if result["signal"] != "neutral":
+            self.assertIsNotNone(result["stop_loss"])
+            self.assertIsNotNone(result["target_price"])
 
     def test_multiindex_field_ticker_layout(self):
         import pandas as pd
