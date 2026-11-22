@@ -373,13 +373,17 @@ def get_signal(ticker: str):
     t = ticker.upper()
     if not re.fullmatch(r"[A-Z0-9^._=-]{1,24}", t):
         return jsonify({"error": "Invalid ticker"}), 400
-    if t in latest_signals:
-        return jsonify(latest_signals[t])
+    with state_lock:
+        cached = latest_signals.get(t)
+    if cached:
+        return jsonify(cached)
     is_etf = t in ETF_TICKERS
     sig = fetch_and_analyze(t, is_etf=is_etf)
     if sig:
+        with state_lock:
+            latest_signals[t] = sig
         return jsonify(sig)
-    return jsonify({"error": "No data"}), 404
+    return jsonify({"error": "No intraday data available"}), 404
 
 
 @app.route("/etf_opportunities")
@@ -389,15 +393,21 @@ def get_etf_opps():
 
 @app.route("/analyze", methods=["POST"])
 def analyze_on_demand():
-    data = request.get_json(silent=True) or {}
-    ticker = (data.get("ticker") or request.args.get("ticker") or "").strip().upper()
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON-Objekt erwartet"}), 400
+    ticker = str(data.get("ticker") or request.args.get("ticker") or "").strip().upper()
     if not re.fullmatch(r"[A-Z0-9^._=-]{1,24}", ticker):
         return jsonify({"error": "ticker required"}), 400
-    is_etf = data.get("is_etf", False) or ticker in ETF_TICKERS
+    is_etf = data.get("is_etf") is True or ticker in ETF_TICKERS
     sig = fetch_and_analyze(ticker, is_etf=is_etf)
     if sig:
+        with state_lock:
+            latest_signals[ticker] = sig
         return jsonify(sig)
-    return jsonify({"error": "analysis failed"}), 500
+    return jsonify({"error": "No intraday data available; check ticker and Yahoo Finance availability"}), 502
 
 
 
