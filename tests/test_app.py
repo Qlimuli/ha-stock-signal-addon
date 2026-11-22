@@ -55,6 +55,7 @@ class SignalEngineTests(unittest.TestCase):
         with patch.object(main.yf, "Ticker", return_value=ticker):
             result = main.fetch_and_analyze("TEST")
         self.assertEqual(result["interval"], "15m")
+        self.assertEqual(result["vwap_type"], "session")
         self.assertEqual(ticker.history.call_args_list[0].kwargs["interval"], "5m")
         self.assertEqual(ticker.history.call_args_list[1].kwargs["interval"], "15m")
 
@@ -64,6 +65,7 @@ class SignalEngineTests(unittest.TestCase):
         with patch.object(main.yf, "Ticker", return_value=ticker):
             result = main.fetch_and_analyze("SPY", is_etf=True)
         self.assertEqual(result["interval"], "1d")
+        self.assertEqual(result["vwap_type"], "rolling20")
         self.assertEqual(ticker.history.call_args.kwargs["interval"], "1d")
 
 
