@@ -13,6 +13,7 @@ import json
 import logging
 import threading
 import re
+import base64
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
@@ -59,6 +60,11 @@ latest_etf_opportunities: List[Dict[str, Any]] = []
 last_update: Optional[str] = None
 mqtt_client: Optional[mqtt.Client] = None
 mqtt_connected = False
+PUSH_SUBSCRIPTIONS_FILE = DATA_DIR / "push_subscriptions.json"
+PUSH_SETTINGS_FILE = DATA_DIR / "push_settings.json"
+VAPID_PRIVATE_FILE = DATA_DIR / "vapid_private.pem"
+VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:admin@localhost")
+push_lock = threading.RLock()
 
 
 def compute_indicators(df: pd.DataFrame, session_vwap: bool = True) -> pd.DataFrame:
@@ -327,12 +333,14 @@ def run_analysis_cycle():
                                      "recommendation": "DCA-Kandidat – vor Kauf selbst prüfen"})
             time.sleep(0.4)
         with state_lock:
+            previous_signals = dict(latest_signals)
             # Remove symbols no longer configured or held, but keep last-known data for
             # active symbols whose latest Yahoo request failed.
             active_tickers = set(tickers)
             latest_signals = {k: v for k, v in latest_signals.items() if k in active_tickers}
             latest_signals.update(results)
             latest_etf_opportunities = sorted(etf_opps, key=lambda x: (-x["confidence"], -x["strength"]))
+        notify_signal_changes(previous_signals, results)
             if results:
                 last_update = datetime.now(timezone.utc).isoformat()
                 cycle_status = "idle"
@@ -387,7 +395,10 @@ def publish_mqtt():
 
 def _mqtt_on_connect(client, userdata, flags, reason_code, properties):
     global mqtt_connected
-    mqtt_connected = int(reason_code) == 0
+    try:
+        mqtt_connected = not reason_code.is_failure if hasattr(reason_code, "is_failure") else int(reason_code) == 0
+    except (TypeError, ValueError, AttributeError):
+        mqtt_connected = str(reason_code).strip().lower() in ("success", "0")
     if mqtt_connected:
         log.info("MQTT connected to %s:%s", MQTT_HOST, MQTT_PORT)
         publish_mqtt()
@@ -423,6 +434,175 @@ def mqtt_connect():
         mqtt_client = None
         mqtt_connected = False
 
+
+
+def _b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _push_keys():
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    with push_lock:
+        if not VAPID_PRIVATE_FILE.exists():
+            key = ec.generate_private_key(ec.SECP256R1())
+            pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+            tmp = VAPID_PRIVATE_FILE.with_suffix(".tmp")
+            tmp.write_bytes(pem)
+            os.chmod(tmp, 0o600)
+            tmp.replace(VAPID_PRIVATE_FILE)
+        pem = VAPID_PRIVATE_FILE.read_bytes()
+        key = serialization.load_pem_private_key(pem, password=None)
+        point = key.public_key().public_numbers()
+        public = b"\x04" + point.x.to_bytes(32, "big") + point.y.to_bytes(32, "big")
+        return pem.decode("ascii"), _b64url(public)
+
+
+def _push_subscriptions_read():
+    try:
+        value = json.loads(PUSH_SUBSCRIPTIONS_FILE.read_text(encoding="utf-8"))
+        return value if isinstance(value, list) else []
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError):
+        log.exception("Push subscription store unreadable")
+        return []
+
+
+def _push_subscriptions_write(items):
+    tmp = PUSH_SUBSCRIPTIONS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    tmp.replace(PUSH_SUBSCRIPTIONS_FILE)
+
+
+def _push_settings_read():
+    defaults = {"enabled": True, "notify_long": True, "notify_short": True, "min_confidence": 65}
+    try:
+        saved = json.loads(PUSH_SETTINGS_FILE.read_text(encoding="utf-8"))
+        if isinstance(saved, dict):
+            defaults.update(saved)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError):
+        log.exception("Push settings unreadable; defaults active")
+    defaults["min_confidence"] = max(0, min(95, int(defaults.get("min_confidence", 65))))
+    return defaults
+
+
+def _push_send(payload):
+    try:
+        from pywebpush import webpush, WebPushException
+        private_key, _ = _push_keys()
+    except Exception:
+        log.exception("Web Push unavailable")
+        return 0
+    with push_lock:
+        subscriptions = _push_subscriptions_read()
+        if not _push_settings_read().get("enabled") or not subscriptions:
+            return 0
+        retained, sent = [], 0
+        for sub in subscriptions:
+            try:
+                webpush(subscription_info=sub, data=json.dumps(payload, ensure_ascii=False),
+                        vapid_private_key=private_key, vapid_claims={"sub": VAPID_SUBJECT}, ttl=300)
+                retained.append(sub)
+                sent += 1
+            except WebPushException as exc:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+                if status not in (404, 410):
+                    retained.append(sub)
+                    log.warning("Push failed (HTTP %s): %s", status, exc)
+                else:
+                    log.info("Removed expired push subscription")
+            except Exception:
+                retained.append(sub)
+                log.exception("Push delivery failed")
+        _push_subscriptions_write(retained)
+    return sent
+
+
+def notify_signal_changes(previous, current):
+    settings = _push_settings_read()
+    if not settings.get("enabled"):
+        return
+    for ticker, signal in current.items():
+        old = previous.get(ticker, {}).get("signal", "neutral")
+        new = signal.get("signal", "neutral")
+        if new not in ("long", "short") or new == old:
+            continue
+        if not settings.get("notify_" + new, True):
+            continue
+        confidence = int(signal.get("confidence", 0))
+        if confidence < settings.get("min_confidence", 65):
+            continue
+        sent = _push_send({"title": f"{ticker}: {new.upper()}",
+            "body": f"Signalwechsel · Confidence {confidence}% · Kurs {signal.get('price', '—')}",
+            "ticker": ticker, "signal": new, "confidence": confidence, "url": "./"})
+        log.info("Push for %s: delivered to %d device(s)", ticker, sent)
+
+
+@app.route("/push/public-key")
+def push_public_key():
+    try:
+        _, public_key = _push_keys()
+        return jsonify({"publicKey": public_key})
+    except Exception:
+        log.exception("VAPID key setup failed")
+        return jsonify({"error": "Push-Schlüssel konnten nicht erstellt werden"}), 500
+
+
+@app.route("/push/settings", methods=["GET", "POST"])
+def push_settings():
+    if request.method == "GET":
+        settings = _push_settings_read()
+        settings["subscriptions"] = len(_push_subscriptions_read())
+        return jsonify(settings)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON-Objekt erwartet"}), 400
+    settings = _push_settings_read()
+    for key in ("enabled", "notify_long", "notify_short"):
+        if key in data:
+            if not isinstance(data[key], bool):
+                return jsonify({"error": f"{key} muss true/false sein"}), 400
+            settings[key] = data[key]
+    if "min_confidence" in data:
+        try:
+            value = int(data["min_confidence"])
+            if not 0 <= value <= 95:
+                raise ValueError()
+            settings["min_confidence"] = value
+        except (TypeError, ValueError):
+            return jsonify({"error": "Confidence muss zwischen 0 und 95 liegen"}), 400
+    tmp = PUSH_SETTINGS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    tmp.replace(PUSH_SETTINGS_FILE)
+    return jsonify(settings)
+
+
+@app.route("/push/subscribe", methods=["POST"])
+def push_subscribe():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("endpoint"), str):
+        return jsonify({"error": "Ungültiges Push-Abonnement"}), 400
+    keys = data.get("keys")
+    if not isinstance(keys, dict) or not keys.get("p256dh") or not keys.get("auth") or not data["endpoint"].startswith("https://"):
+        return jsonify({"error": "Push-Endpunkt oder Schlüssel ungültig"}), 400
+    with push_lock:
+        items = [x for x in _push_subscriptions_read() if x.get("endpoint") != data["endpoint"]]
+        items.append({"endpoint": data["endpoint"], "keys": {"p256dh": str(keys["p256dh"]), "auth": str(keys["auth"])}})
+        _push_subscriptions_write(items)
+    return jsonify({"status": "subscribed", "subscriptions": len(items)}), 201
+
+
+@app.route("/push/test", methods=["POST"])
+def push_test():
+    if not _push_subscriptions_read():
+        return jsonify({"error": "Noch kein Gerät registriert"}), 400
+    sent = _push_send({"title": "Stock Signals – Test", "body": "Push-Benachrichtigungen sind eingerichtet.", "url": "./"})
+    return jsonify({"status": "sent" if sent else "failed", "devices": sent}), 200 if sent else 502
 
 @app.route("/")
 def index():
