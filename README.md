@@ -1,47 +1,57 @@
-# Home Assistant Addon: Stock & ETF Signal Server Pro
+# Home Assistant Add-on: Stock & ETF Signal Server
 
-Professioneller **Aktien- und ETF-Signal-Server** mit Multi-Faktor-Analyse – **ohne API-Keys**.
+Ein Home-Assistant-Add-on für technische Aktien- und ETF-Analyse mit REST-API, MQTT und Web-Dashboard. Marktdaten werden über Yahoo Finance bezogen; ein eigener API-Key ist nicht erforderlich.
 
-## Features (v1.2)
+## Funktionen
 
-| Bereich | Inhalt |
-|---------|--------|
-| **Signale** | Long / Short / Neutral mit Stärke + Confidence |
-| **Indikatoren** | RSI, MACD, Bollinger, SMA/EMA, Stochastic, ADX, ATR%, Volumen |
-| **Regime** | Uptrend / Downtrend / Range + Risiko (Volatilität) |
-| **ETF-Nachkauf** | Dip-Bias, DCA-Empfehlungen |
-| **Portfolio** | Holdings speichern, P&L, gewichtete Nachkauf-Prioritäten |
-| **GUI** | Tabs: Dashboard, Signale, Portfolio, On-Demand-Analyse |
-| **MQTT / REST** | Sensoren + API für Automationen |
+| Bereich | Funktion |
+|---|---|
+| Signale | Long / Short / Neutral mit Stärke und heuristischem Confidence-Wert |
+| Indikatoren | RSI, MACD, Bollinger-Bänder, SMA 20/50/200, EMA 12/26 und Volumen |
+| ETFs | ETF-Kandidaten für weitere Prüfung / DCA-Beobachtung |
+| Portfolio | Positionen speichern, Marktwert und P&L berechnen, Empfehlungen anzeigen |
+| Dashboard | Dashboard, Signale, Portfolio und On-Demand-Analyse |
+| Integration | MQTT-Sensorwerte und REST-Endpunkte |
+
+**Confidence ist keine Eintrittswahrscheinlichkeit.** Die Signale beruhen auf technischen Regeln und sind weder Prognose noch Finanzberatung. Standardmäßig werden Aktien und ETFs analysiert.
 
 ## Installation
 
-1. HA → **Einstellungen → Add-ons → Add-on Store**
+1. Home Assistant → **Einstellungen → Add-ons → Add-on Store**
 2. Repositories → `https://github.com/Qlimuli/ha-stock-signal-addon`
-3. **Stock & ETF Signal Server** installieren / updaten auf **1.2.0** und neu starten
+3. **Stock & ETF Signal Server** installieren und starten.
 
-## Scalable Capital
+Nach dem Update auf Version 1.3.0 Add-on neu starten. Ticker, Intervall und MQTT können über die Add-on-Optionen angepasst werden.
 
-Der offizielle Scalable-MCP (`https://mcp.scalable.capital/mcp`) nutzt **OAuth im AI-Client** (Grok, Claude, …) – nicht im Add-on-Container.
+## Portfolio
 
-**Im Add-on:**
-- Tab **Portfolio** → Positionen manuell oder per JSON-Import
-- Empfehlungen kombinieren Live-Signale mit deinem Depot (P&L, Dip vs. Einstand)
+Positionen können im Portfolio-Tab manuell angelegt, als JSON importiert oder exportiert werden. Gespeichert wird dauerhaft in `/data/portfolio.json`.
 
-**Optional:**
-- Scalable Web → Profil → Sicherheit → *Agentic Investing* (Read-only)
-- HACS-Integration [somansch/scalable](https://github.com/somansch/scalable) für HA-Sensoren
+## REST API
 
-## REST (Port 8099 / Ingress)
+Port **8099** (über Home-Assistant-Ingress oder direkt, sofern Port freigegeben):
 
-- `GET /signals` · `GET /signal/<T>` · `POST /analyze`
-- `GET|POST /portfolio` · `POST /portfolio/holding` · `DELETE /portfolio/holding/<T>`
-- `GET /recommendations` · `POST /refresh` · `GET /health`
+- `GET /health`
+- `GET /signals`
+- `GET /signal/<TICKER>`
+- `POST /analyze`
+- `POST /refresh`
+- `GET|POST /portfolio`
+- `POST /portfolio/holding`
+- `DELETE /portfolio/holding/<TICKER>`
+- `GET /recommendations`
+- `GET /etf_opportunities`
+
+Weitere Details stehen in [stock_signal/DOCS.md](stock_signal/DOCS.md).
+
+## MQTT
+
+Topics beginnen standardmäßig mit `stock_signal/`. Das Add-on veröffentlicht eine Zusammenfassung, je Ticker JSON sowie Signal, Stärke und Confidence.
 
 ## Disclaimer
 
-**Keine Finanzberatung.** Technische Analyse ist ein Werkzeug, keine Garantie.
+Keine Finanzberatung. Technische Signale können falsch sein; Marktdaten können verzögert oder unvollständig sein. Es werden keine automatischen Kauf- oder Verkaufsaufträge ausgeführt.
 
-## License
+## Lizenz
 
 MIT

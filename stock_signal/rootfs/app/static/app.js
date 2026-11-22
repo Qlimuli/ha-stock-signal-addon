@@ -8,6 +8,7 @@
   let allSignals = {};
   let etfOpps = [];
   let currentFilter = "all";
+  let portfolioData = [];
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -20,6 +21,7 @@
       allSignals = data.signals || {};
       etfOpps = data.etf_opportunities || [];
       updateUI(data.last_update);
+      await loadPortfolio();
       setStatus(true);
     } catch (e) {
       console.error(e);
@@ -33,10 +35,14 @@
     btn.classList.add("loading");
     btn.innerHTML = `<span class="icon">↻</span> Analysiere…`;
     try {
-      await fetch(`${API}/signals`);
-      try {
-        await fetch(`${API}/refresh`, { method: "POST" });
-      } catch (_) {}
+      const started = await fetch(`${API}/refresh`, { method: "POST" });
+      if (!started.ok && started.status !== 202) throw new Error(`HTTP ${started.status}`);
+      for (let i = 0; i < 60; i++) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const response = await fetch(`${API}/signals`);
+        const data = await response.json();
+        if (data.cycle_status !== "running") break;
+      }
       await loadSignals();
     } finally {
       btn.classList.remove("loading");
@@ -63,6 +69,7 @@
 
     renderEtf();
     renderSignals();
+    renderDashboardRecommendations();
   }
 
   function renderEtf() {
@@ -79,6 +86,7 @@
         <div class="rec">${esc(o.recommendation || "Guter Zeitpunkt zum Nachkaufen")}</div>
         <div class="meta">
           <span>Stärke ${o.strength}</span>
+          <span>Confidence ${o.confidence ?? 0}%</span>
           <span>RSI ${o.rsi ?? "—"}</span>
           <span>${o.price != null ? formatPrice(o.price) : ""}</span>
         </div>
@@ -126,7 +134,7 @@
             <div class="strength-bar">
               <div class="strength-fill ${s.signal}" style="width:${Math.min(100, s.strength || 0)}%"></div>
             </div>
-            <span class="strength-val">${s.strength ?? 0}</span>
+            <span class="strength-val">${s.strength ?? 0} · C ${s.confidence ?? 0}%</span>
           </div>
           <div class="reasons">${esc(reasons)}</div>
         </div>
@@ -136,6 +144,80 @@
     grid.querySelectorAll(".signal-card").forEach(el => {
       el.addEventListener("click", () => openModal(el.dataset.ticker));
     });
+  }
+
+
+  async function api(path, options = {}) {
+    const response = await fetch(`${API}${path}`, {
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      ...options
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+
+  async function loadPortfolio() {
+    try {
+      const data = await api("/portfolio");
+      portfolioData = data.holdings || [];
+      $("#pfTotals").textContent = `Wert ${formatPrice(data.market_value)} · P&L ${formatPrice(data.pnl)}`;
+      $("#pfBody").innerHTML = portfolioData.map(h => `
+        <tr>
+          <td>${esc(h.ticker)}</td><td>${h.quantity}</td><td>${formatPrice(h.avg_cost)}</td>
+          <td>${h.price == null ? "—" : formatPrice(h.price)}</td>
+          <td>${h.market_value == null ? "—" : formatPrice(h.market_value)}</td>
+          <td>${h.pnl == null ? "—" : formatPrice(h.pnl)} (${h.pnl_percent ?? "—"}%)</td>
+          <td><span class="badge ${esc(h.signal)}">${esc(h.signal)}</span></td>
+          <td><button class="btn btn-secondary pf-delete" data-ticker="${esc(h.ticker)}">×</button></td>
+        </tr>`).join("") || '<tr><td colspan="8" class="empty">Noch keine Positionen eingetragen.</td></tr>';
+      $("#pfBody").querySelectorAll(".pf-delete").forEach(btn => btn.addEventListener("click", async () => {
+        if (!confirm(`Position ${btn.dataset.ticker} löschen?`)) return;
+        try { await api(`/portfolio/holding/${encodeURIComponent(btn.dataset.ticker)}`, { method: "DELETE" }); await loadPortfolio(); }
+        catch (e) { alert(e.message); }
+      }));
+      const recs = await api("/recommendations");
+      $("#pfRecs").innerHTML = (recs.recommendations || []).map(h =>
+        `<div class="rec-item"><strong>${esc(h.ticker)}</strong> · ${esc(h.signal)} · Confidence ${h.confidence}% · P&L ${h.pnl_percent ?? "—"}%</div>`
+      ).join("") || '<div class="empty">Noch keine Empfehlungen.</div>';
+      renderDashboardRecommendations(recs.recommendations || []);
+    } catch (e) {
+      console.error("Portfolio:", e);
+      $("#pfBody").innerHTML = `<tr><td colspan="8" class="empty">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function renderDashboardRecommendations(recommendations) {
+    const target = $("#dashRecs");
+    if (!target) return;
+    const rows = (recommendations && recommendations.length ? recommendations : Object.values(allSignals).filter(s => s.signal !== "neutral"))
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0)).slice(0, 5);
+    target.innerHTML = rows.length ? rows.slice(0, 5).map(s =>
+      `<div class="rec-item"><strong>${esc(s.ticker)}</strong> · ${esc(s.signal)} · Stärke ${s.strength ?? 0} · Confidence ${s.confidence ?? 0}%</div>`
+    ).join("") : '<div class="empty">Noch keine klaren Signale.</div>';
+    const sum = $("#sumRec");
+    if (sum) sum.textContent = rows.length;
+  }
+
+  function showPanel(name) {
+    $(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === name));
+    $(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
+    if (name === "portfolio") loadPortfolio();
+  }
+
+  function openHoldingModal() { $("#holdModal").hidden = false; }
+  function closeHoldingModal() { $("#holdModal").hidden = true; }
+
+  async function analyzeTicker(event) {
+    event.preventDefault();
+    const ticker = $("#analyzeTicker").value.trim().toUpperCase();
+    const is_etf = $("#analyzeEtf").checked;
+    const out = $("#analyzeResult");
+    out.textContent = "Analysiere…";
+    try {
+      const result = await api("/analyze", { method: "POST", body: JSON.stringify({ ticker, is_etf }) });
+      out.innerHTML = `<div class="signal-card ${esc(result.signal)}"><strong>${esc(result.ticker)} · ${esc(result.signal)}</strong><p>Kurs ${result.price == null ? "—" : formatPrice(result.price)} · Stärke ${result.strength} · Confidence ${result.confidence ?? 0}%</p><p>${esc((result.reasons || []).join(" · "))}</p></div>`;
+    } catch (e) { out.textContent = e.message; }
   }
 
   function openModal(ticker) {
@@ -152,6 +234,7 @@
 
         <div class="metric-grid">
           <div class="metric"><div class="m-label">Kurs</div><div class="m-value">${s.price != null ? formatPrice(s.price) : "—"}</div></div>
+          <div class="metric"><div class="m-label">Confidence (heuristisch)</div><div class="m-value">${s.confidence ?? 0}%</div></div>
           <div class="metric"><div class="m-label">RSI</div><div class="m-value">${s.rsi ?? "—"}</div></div>
           <div class="metric"><div class="m-label">MACD Hist</div><div class="m-value">${s.macd_hist ?? "—"}</div></div>
           <div class="metric"><div class="m-label">BB %</div><div class="m-value">${s.bb_pct != null ? (s.bb_pct * 100).toFixed(0) + "%" : "—"}</div></div>
@@ -195,6 +278,32 @@
   }
 
   $("#btnRefresh").addEventListener("click", forceRefresh);
+  $(".tab").forEach(tab => tab.addEventListener("click", () => showPanel(tab.dataset.tab)));
+  $("#btnAddHolding").addEventListener("click", openHoldingModal);
+  $("#holdClose").addEventListener("click", closeHoldingModal);
+  $("#holdX").addEventListener("click", closeHoldingModal);
+  $("#holdForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(form.entries());
+    payload.quantity = Number(payload.quantity); payload.avg_cost = Number(payload.avg_cost);
+    payload.is_etf = form.has("is_etf");
+    try { await api("/portfolio/holding", { method: "POST", body: JSON.stringify(payload) }); event.currentTarget.reset(); closeHoldingModal(); await loadPortfolio(); }
+    catch (e) { alert(e.message); }
+  });
+  $("#btnExportJson").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(portfolioData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = "stock-signal-portfolio.json"; a.click(); URL.revokeObjectURL(url);
+  });
+  $("#btnImportJson").addEventListener("click", () => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = "application/json";
+    input.onchange = async () => {
+      try { const parsed = JSON.parse(await input.files[0].text()); if (!Array.isArray(parsed)) throw new Error("JSON muss ein Array sein"); await api("/portfolio", { method: "POST", body: JSON.stringify(parsed) }); await loadPortfolio(); }
+      catch (e) { alert(e.message); }
+    }; input.click();
+  });
+  $("#analyzeForm").addEventListener("submit", analyzeTicker);
   $("#modalClose").addEventListener("click", closeModal);
   $("#modalX").addEventListener("click", closeModal);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
