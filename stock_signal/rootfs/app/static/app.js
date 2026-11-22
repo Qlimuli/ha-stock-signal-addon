@@ -189,7 +189,7 @@
   function renderDashboardRecommendations(recommendations) {
     const target = $("#dashRecs");
     if (!target) return;
-    const rows = recommendations || Object.values(allSignals).filter(s => s.signal !== "neutral")
+    const rows = (recommendations && recommendations.length ? recommendations : Object.values(allSignals).filter(s => s.signal !== "neutral"))
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0)).slice(0, 5);
     target.innerHTML = rows.length ? rows.slice(0, 5).map(s =>
       `<div class="rec-item"><strong>${esc(s.ticker)}</strong> · ${esc(s.signal)} · Stärke ${s.strength ?? 0} · Confidence ${s.confidence ?? 0}%</div>`
