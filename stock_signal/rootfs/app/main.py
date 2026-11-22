@@ -341,6 +341,7 @@ def run_analysis_cycle():
             latest_signals.update(results)
             latest_etf_opportunities = sorted(etf_opps, key=lambda x: (-x["confidence"], -x["strength"]))
         notify_signal_changes(previous_signals, results)
+        with state_lock:
             if results:
                 last_update = datetime.now(timezone.utc).isoformat()
                 cycle_status = "idle"
