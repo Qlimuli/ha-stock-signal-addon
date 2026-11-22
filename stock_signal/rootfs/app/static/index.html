@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Stock & ETF Signals</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">📈</div>
+        <div>
+          <h1>Stock & ETF Signals</h1>
+          <p class="subtitle">Technische Analyse · Long / Short · ETF-Nachkauf</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="last-update" id="lastUpdate">—</div>
+        <button class="btn btn-primary" id="btnRefresh" title="Analyse neu starten">
+          <span class="icon">↻</span> Aktualisieren
+        </button>
+      </div>
+    </header>
+
+    <!-- Summary cards -->
+    <section class="summary" id="summary">
+      <div class="card summary-card">
+        <div class="label">Signale</div>
+        <div class="value" id="sumTickers">—</div>
+      </div>
+      <div class="card summary-card long">
+        <div class="label">Long</div>
+        <div class="value" id="sumLong">—</div>
+      </div>
+      <div class="card summary-card short">
+        <div class="label">Short</div>
+        <div class="value" id="sumShort">—</div>
+      </div>
+      <div class="card summary-card etf">
+        <div class="label">ETF-Chancen</div>
+        <div class="value" id="sumEtf">—</div>
+      </div>
+    </section>
+
+    <!-- ETF Opportunities -->
+    <section class="section" id="etfSection" style="display:none">
+      <h2>🎯 ETF-Nachkauf-Empfehlungen</h2>
+      <div class="etf-grid" id="etfGrid"></div>
+    </section>
+
+    <!-- All signals -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Alle Signale</h2>
+        <div class="filters">
+          <button class="chip active" data-filter="all">Alle</button>
+          <button class="chip" data-filter="long">Long</button>
+          <button class="chip" data-filter="short">Short</button>
+          <button class="chip" data-filter="neutral">Neutral</button>
+          <button class="chip" data-filter="etf">Nur ETFs</button>
+        </div>
+      </div>
+      <div class="signals-grid" id="signalsGrid">
+        <div class="loading">Lade Signale…</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Keine Finanzberatung · Nur technische Analyse</span>
+      <span id="apiStatus" class="status">●</span>
+    </footer>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-backdrop" id="modalClose"></div>
+    <div class="modal-content">
+      <button class="modal-x" id="modalX">×</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
