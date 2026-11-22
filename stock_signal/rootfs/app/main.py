@@ -61,9 +61,17 @@ mqtt_client: Optional[mqtt.Client] = None
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate indicators on chronologically ordered, single-symbol OHLCV data."""
     df = df.copy()
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
+        # yfinance has returned both (field, ticker) and (ticker, field) layouts.
+        for level in range(df.columns.nlevels):
+            if "Close" in set(df.columns.get_level_values(level)):
+                df.columns = df.columns.get_level_values(level)
+                break
+    if "Close" not in df.columns:
+        raise ValueError("Yahoo Finance response has no Close column")
+    df = df[~df.index.duplicated(keep="last")].sort_index()
     df = df.dropna(subset=["Close"])
     close = pd.to_numeric(df["Close"], errors="coerce")
     volume = pd.to_numeric(df["Volume"], errors="coerce").fillna(0)
@@ -88,8 +96,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict[str, Any]:
-    if df is None or len(df) < 50:
-        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Kursdaten (mindestens 50 Handelstage erforderlich)"], "price": None, "is_etf": is_etf}
+    if df is None or len(df) < 200:
+        return {"ticker": ticker, "signal": "neutral", "strength": 0, "confidence": 0, "data_sufficient": False, "reasons": ["Zu wenige Intraday-Kerzen (mindestens 200 x 5 Minuten erforderlich)"], "price": None, "is_etf": is_etf}
     latest = df.iloc[-1]
     price = float(latest["Close"])
     rsi = float(latest.get("RSI", 50) or 50)
@@ -192,13 +200,21 @@ def generate_signal(ticker: str, df: pd.DataFrame, is_etf: bool = False) -> Dict
 def fetch_and_analyze(ticker: str, is_etf: bool = False) -> Optional[Dict[str, Any]]:
     try:
         t = yf.Ticker(ticker)
-        period = "2y" if LOOKBACK_DAYS > 180 else "1y"
-        df = t.history(period=period, interval="1d", auto_adjust=True)
-        if df.empty or len(df) < 30:
-            log.warning(f"No/insufficient data for {ticker}")
+        # The strategy targets short holding periods: use 5-minute candles, not daily bars.
+        df = t.history(period="5d", interval="5m", auto_adjust=True, prepost=False, timeout=20)
+        interval = "5m"
+        if df.empty or len(df) < 200:
+            # Fallback when Yahoo returns too few 5-minute candles.
+            df = t.history(period="60d", interval="15m", auto_adjust=True, prepost=False, timeout=20)
+            interval = "15m"
+        if df.empty or len(df) < 200:
+            log.warning("No/insufficient intraday data for %s (%d candles)", ticker, len(df))
             return None
         df = compute_indicators(df)
-        return generate_signal(ticker, df, is_etf=is_etf)
+        result = generate_signal(ticker, df, is_etf=is_etf)
+        result["interval"] = interval
+        result["market_data_time"] = df.index[-1].isoformat()
+        return result
     except Exception as e:
         log.error(f"Error analyzing {ticker}: {e}")
         return None
@@ -213,8 +229,18 @@ def run_analysis_cycle():
         cycle_status = "running"
     try:
         results, etf_opps = {}, []
-        for ticker in list(dict.fromkeys(TICKERS + ETF_TICKERS)):
-            sig = fetch_and_analyze(ticker, is_etf=ticker in ETF_TICKERS)
+        # Include manually held positions so their prices and signals are refreshed too.
+        try:
+            holdings = _portfolio_read()
+        except Exception:
+            log.exception("Could not load portfolio for analysis cycle")
+            holdings = []
+        held_etfs = {x.get("ticker") for x in holdings if isinstance(x, dict) and x.get("is_etf")}
+        tickers = list(dict.fromkeys(TICKERS + ETF_TICKERS + [
+            x.get("ticker") for x in holdings if isinstance(x, dict) and x.get("ticker")
+        ]))
+        for ticker in tickers:
+            sig = fetch_and_analyze(ticker, is_etf=ticker in ETF_TICKERS or ticker in held_etfs)
             if sig is not None:
                 results[ticker] = sig
                 if ticker in ETF_TICKERS and sig["signal"] == "long" and sig.get("confidence", 0) >= 60:
@@ -225,8 +251,11 @@ def run_analysis_cycle():
         with state_lock:
             latest_signals.update(results)
             latest_etf_opportunities = sorted(etf_opps, key=lambda x: (-x["confidence"], -x["strength"]))
-            last_update = datetime.now(timezone.utc).isoformat()
-            cycle_status = "idle"
+            if results:
+                last_update = datetime.now(timezone.utc).isoformat()
+                cycle_status = "idle"
+            else:
+                cycle_status = "error"
         if MQTT_ENABLED and mqtt_client:
             publish_mqtt()
         log.info("Analysis complete: %d refreshed, %d ETF candidates", len(results), len(etf_opps))
@@ -340,12 +369,17 @@ def analyze_on_demand():
 
 
 def _portfolio_read():
-    try:
-        value = json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8")) if PORTFOLIO_FILE.exists() else []
-        return value if isinstance(value, list) else []
-    except (OSError, ValueError):
-        log.exception("Portfolio read failed")
+    if not PORTFOLIO_FILE.exists():
         return []
+    try:
+        value = json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        # Never silently replace a damaged portfolio with an empty one.
+        log.exception("Portfolio read failed")
+        raise RuntimeError("Portfolio-Datei kann nicht gelesen werden; vorhandene Daten bleiben unangetastet") from exc
+    if not isinstance(value, list):
+        raise RuntimeError("Portfolio-Datei ist beschädigt: JSON-Array erwartet")
+    return value
 
 
 def _portfolio_write(items):
@@ -355,26 +389,30 @@ def _portfolio_write(items):
 
 
 def _portfolio_snapshot():
-    holdings = _portfolio_read()
-    rows, total_value, total_cost, valued_cost = [], 0.0, 0.0, 0.0
     with state_lock:
+        holdings = _portfolio_read()
         signals = dict(latest_signals)
+        updated = last_update
+    rows, total_value, total_cost, valued_cost, total_pnl = [], 0.0, 0.0, 0.0, 0.0
     for item in holdings:
         sig = signals.get(item["ticker"], {})
         qty, cost, price = float(item["quantity"]), float(item["avg_cost"]), sig.get("price")
-        value = float(price) * qty if price is not None else None
+        value = float(price) * qty if price is not None and np.isfinite(float(price)) else None
         invested = qty * cost
         pnl = value - invested if value is not None else None
         total_cost += invested
         if value is not None:
             total_value += value
             valued_cost += invested
+            total_pnl += pnl
         rows.append({**item, "price": price, "market_value": round(value, 2) if value is not None else None,
                      "invested": round(invested, 2), "pnl": round(pnl, 2) if pnl is not None else None,
                      "pnl_percent": round(pnl / invested * 100, 2) if pnl is not None and invested else None,
-                     "signal": sig.get("signal", "unknown"), "confidence": sig.get("confidence", 0)})
+                     "signal": sig.get("signal", "unknown"), "confidence": sig.get("confidence", 0),
+                     "price_available": value is not None})
     return {"holdings": rows, "market_value": round(total_value, 2), "invested": round(total_cost, 2),
-            "pnl": round(total_value - valued_cost, 2), "last_update": last_update}
+            "valued_invested": round(valued_cost, 2), "pnl": round(total_pnl, 2),
+            "unpriced_count": sum(1 for x in rows if not x["price_available"]), "last_update": updated}
 
 
 @app.route("/portfolio", methods=["GET", "POST"])
@@ -387,12 +425,14 @@ def portfolio():
     try:
         clean = []
         for item in data:
+            if not isinstance(item, dict):
+                raise ValueError("Jede Position muss ein JSON-Objekt sein")
             ticker = str(item.get("ticker", "")).strip().upper()
             qty, cost = float(item.get("quantity")), float(item.get("avg_cost"))
             if not re.fullmatch(r"[A-Z0-9^._=-]{1,24}", ticker) or not np.isfinite(qty) or not np.isfinite(cost) or qty <= 0 or cost < 0:
                 raise ValueError("Invalid ticker, quantity or average cost")
             clean.append({"ticker": ticker, "name": str(item.get("name") or ticker)[:80],
-                          "quantity": qty, "avg_cost": cost, "is_etf": bool(item.get("is_etf"))})
+                          "quantity": qty, "avg_cost": cost, "is_etf": item.get("is_etf") is True})
         with state_lock:
             _portfolio_write(clean)
         return jsonify(_portfolio_snapshot())
@@ -402,20 +442,22 @@ def portfolio():
 
 @app.route("/portfolio/holding", methods=["POST"])
 def add_holding():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON-Objekt erwartet"}), 400
     try:
         ticker = str(data.get("ticker", "")).strip().upper()
         qty, cost = float(data.get("quantity")), float(data.get("avg_cost"))
         if not re.fullmatch(r"[A-Z0-9^._=-]{1,24}", ticker) or not np.isfinite(qty) or not np.isfinite(cost) or qty <= 0 or cost < 0:
             raise ValueError("Invalid ticker, quantity or average cost")
         holding = {"ticker": ticker, "name": str(data.get("name") or ticker)[:80],
-                   "quantity": qty, "avg_cost": cost, "is_etf": bool(data.get("is_etf"))}
+                   "quantity": qty, "avg_cost": cost, "is_etf": data.get("is_etf") is True}
         with state_lock:
             items = [x for x in _portfolio_read() if x.get("ticker") != ticker]
             items.append(holding)
             _portfolio_write(items)
         return jsonify(_portfolio_snapshot()), 201
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, AttributeError) as exc:
         return jsonify({"error": str(exc)}), 400
 
 
