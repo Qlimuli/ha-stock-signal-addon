@@ -133,6 +133,8 @@
             <span class="badge ${s.signal}">${s.signal}</span>
           </div>
           <div class="price">${s.price != null ? formatPrice(s.price) : "—"}</div>
+          <div class="meta-row"><span>${esc(s.interval || "—")} Kerzen</span><span>VWAP ${s.vwap != null ? formatPrice(s.vwap) : "—"}</span><span>ATR ${s.atr != null ? formatPrice(s.atr) : "—"}</span></div>
+          ${s.signal !== "neutral" ? `<div class="meta-row risk"><span>SL ${s.stop_loss != null ? formatPrice(s.stop_loss) : "—"}</span><span>Ziel ${s.target_price != null ? formatPrice(s.target_price) : "—"}</span></div>` : ""}
           <div class="strength-row">
             <div class="strength-bar">
               <div class="strength-fill ${s.signal}" style="width:${Math.min(100, s.strength || 0)}%"></div>
@@ -244,6 +246,13 @@
           <div class="metric"><div class="m-label">SMA 20</div><div class="m-value">${s.sma20 != null ? formatPrice(s.sma20) : "—"}</div></div>
           <div class="metric"><div class="m-label">SMA 50</div><div class="m-value">${s.sma50 != null ? formatPrice(s.sma50) : "—"}</div></div>
           <div class="metric"><div class="m-label">SMA 200</div><div class="m-value">${s.sma200 != null ? formatPrice(s.sma200) : "—"}</div></div>
+          <div class="metric"><div class="m-label">Session VWAP</div><div class="m-value">${s.vwap != null ? formatPrice(s.vwap) : "—"}</div></div>
+          <div class="metric"><div class="m-label">ATR / Volatilität</div><div class="m-value">${s.atr != null ? formatPrice(s.atr) + " (" + (s.atr_percent ?? "—") + "%)" : "—"}</div></div>
+          <div class="metric"><div class="m-label">Stochastic %K</div><div class="m-value">${s.stoch_k ?? "—"}</div></div>
+          <div class="metric"><div class="m-label">ADX</div><div class="m-value">${s.adx ?? "—"}</div></div>
+          <div class="metric"><div class="m-label">CCI</div><div class="m-value">${s.cci ?? "—"}</div></div>
+          <div class="metric"><div class="m-label">Stop-Loss (ATR 1,5x)</div><div class="m-value">${s.stop_loss != null ? formatPrice(s.stop_loss) : "—"}</div></div>
+          <div class="metric"><div class="m-label">Kursziel (ATR 2x)</div><div class="m-value">${s.target_price != null ? formatPrice(s.target_price) : "—"}</div></div>
           <div class="metric"><div class="m-label">Long / Short Score</div><div class="m-value">${s.long_score ?? 0} / ${s.short_score ?? 0}</div></div>
         </div>
 
