@@ -388,7 +388,7 @@
     });
   });
 
-  if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("./sw.js").catch(e => console.warn("Service worker:", e));
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("./sw.js").catch(e => console.warn("Service worker:", e));
   loadSignals();
   setInterval(loadSignals, 60000);
 })();
