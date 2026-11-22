@@ -133,7 +133,7 @@
             <span class="badge ${s.signal}">${s.signal}</span>
           </div>
           <div class="price">${s.price != null ? formatPrice(s.price) : "—"}</div>
-          <div class="meta-row"><span>${esc(s.interval || "—")} Kerzen</span><span>VWAP ${s.vwap != null ? formatPrice(s.vwap) : "—"}</span><span>ATR ${s.atr != null ? formatPrice(s.atr) : "—"}</span></div>
+          <div class="meta-row"><span>${esc(s.interval || "—")} Kerzen</span><span>Daten ${formatTimestamp(s.market_data_time)}</span><span>VWAP ${s.vwap != null ? formatPrice(s.vwap) : "—"}</span><span>ATR ${s.atr != null ? formatPrice(s.atr) : "—"}</span></div>
           ${s.signal !== "neutral" ? `<div class="meta-row risk"><span>SL ${s.stop_loss != null ? formatPrice(s.stop_loss) : "—"}</span><span>Ziel ${s.target_price != null ? formatPrice(s.target_price) : "—"}</span></div>` : ""}
           <div class="strength-row">
             <div class="strength-bar">
@@ -265,6 +265,13 @@
 
   function closeModal() {
     $("#modal").hidden = true;
+  }
+
+  function formatTimestamp(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
   function formatPrice(p) {
