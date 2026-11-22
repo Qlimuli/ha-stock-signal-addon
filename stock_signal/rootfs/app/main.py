@@ -327,6 +327,10 @@ def run_analysis_cycle():
                                      "recommendation": "DCA-Kandidat – vor Kauf selbst prüfen"})
             time.sleep(0.4)
         with state_lock:
+            # Remove symbols no longer configured or held, but keep last-known data for
+            # active symbols whose latest Yahoo request failed.
+            active_tickers = set(tickers)
+            latest_signals = {k: v for k, v in latest_signals.items() if k in active_tickers}
             latest_signals.update(results)
             latest_etf_opportunities = sorted(etf_opps, key=lambda x: (-x["confidence"], -x["strength"]))
             if results:
