@@ -1,71 +1,46 @@
-# Home Assistant Addon: Stock & ETF Signal Server
+# Home Assistant Addon: Stock & ETF Signal Server Pro
 
-**Aktien- und ETF-Signal-Server** mit seriöser technischer Analyse – **ohne API-Keys**.
+Professioneller **Aktien- und ETF-Signal-Server** mit Multi-Faktor-Analyse – **ohne API-Keys**.
 
-- Datenquelle: Yahoo Finance (`yfinance`)
-- Indikatoren: RSI, MACD, Bollinger Bands, SMA/EMA, Volumen
-- Signale: **Long / Short / Neutral** mit Stärke und Begründungen
-- Speziell für ETFs: Erkennung guter Nachkauf-Zeitpunkte (DCA / Buy-the-Dip)
-- MQTT-Sensoren + REST-API
-- Portfolio-Abfrage: **Scalable Capital offizieller MCP** (separat verbinden)
+## Features (v1.2)
 
-## Features
-
-| Feature | Beschreibung |
-|---------|--------------|
-| Long-Signale | Oversold RSI, bullisches MACD, untere Bollinger, Uptrend |
-| Short-Signale | Overbought, bearisches MACD, obere Bollinger, Downtrend |
-| ETF-Nachkauf | Zusätzliche Gewichtung auf Dips für breite ETFs |
-| MQTT | Sensoren unter `stock_signal/<TICKER>` |
-| REST | `/signals`, `/signal/<TICKER>`, `/etf_opportunities`, `/analyze` |
+| Bereich | Inhalt |
+|---------|--------|
+| **Signale** | Long / Short / Neutral mit Stärke + Confidence |
+| **Indikatoren** | RSI, MACD, Bollinger, SMA/EMA, Stochastic, ADX, ATR%, Volumen |
+| **Regime** | Uptrend / Downtrend / Range + Risiko (Volatilität) |
+| **ETF-Nachkauf** | Dip-Bias, DCA-Empfehlungen |
+| **Portfolio** | Holdings speichern, P&L, gewichtete Nachkauf-Prioritäten |
+| **GUI** | Tabs: Dashboard, Signale, Portfolio, On-Demand-Analyse |
+| **MQTT / REST** | Sensoren + API für Automationen |
 
 ## Installation
 
-1. In Home Assistant → **Einstellungen → Add-ons → Add-on Store**
-2. Drei Punkte → **Repositories** → URL hinzufügen:
-   ```
-   https://github.com/Qlimuli/ha-stock-signal-addon
-   ```
-3. Addon **Stock & ETF Signal Server** installieren und starten.
+1. HA → **Einstellungen → Add-ons → Add-on Store**
+2. Repositories → `https://github.com/Qlimuli/ha-stock-signal-addon`
+3. **Stock & ETF Signal Server** installieren / updaten auf **1.2.0** und neu starten
 
-Oder per MCP (ha_manage_app):
+## Scalable Capital
 
-```
-action=add_repository, repository=https://github.com/Qlimuli/ha-stock-signal-addon
-```
+Der offizielle Scalable-MCP (`https://mcp.scalable.capital/mcp`) nutzt **OAuth im AI-Client** (Grok, Claude, …) – nicht im Add-on-Container.
 
-Danach installieren und starten.
+**Im Add-on:**
+- Tab **Portfolio** → Positionen manuell oder per JSON-Import
+- Empfehlungen kombinieren Live-Signale mit deinem Depot (P&L, Dip vs. Einstand)
 
-## Konfiguration (Options)
+**Optional:**
+- Scalable Web → Profil → Sicherheit → *Agentic Investing* (Read-only)
+- HACS-Integration [somansch/scalable](https://github.com/somansch/scalable) für HA-Sensoren
 
-- `tickers`: Komma-separierte Liste (z.B. `AAPL,MSFT,TSLA,VWCE.DE`)
-- `etf_tickers`: ETFs, die speziell auf Nachkauf-Signale geprüft werden
-- `update_interval_minutes`: Analyse-Intervall (Standard 30)
-- `rsi_oversold` / `rsi_overbought`: Schwellen (30/70)
-- MQTT wird automatisch über Supervisor erkannt, falls vorhanden.
+## REST (Port 8099 / Ingress)
 
-## Scalable Capital Integration
-
-Scalable bietet einen **offiziellen MCP-Server**:
-
-1. In Scalable Web → Profil → Sicherheit → **Agentic Investing** aktivieren
-2. MCP-URL: `https://mcp.scalable.capital/mcp`
-3. In diesem Chat den Connector **Scalable Capital** verbinden
-
-Danach kann ich (oder du) dein Depot abfragen und die Signale des Addons damit kombinieren.
-
-## REST API (Port 8099)
-
-- `GET /health`
-- `GET /signals` – alle aktuellen Signale
-- `GET /signal/AAPL` – einzelnes Signal (on-demand möglich)
-- `GET /etf_opportunities` – aktuelle ETF-Nachkauf-Empfehlungen
-- `POST /analyze` `{"ticker": "NVDA"}`
+- `GET /signals` · `GET /signal/<T>` · `POST /analyze`
+- `GET|POST /portfolio` · `POST /portfolio/holding` · `DELETE /portfolio/holding/<T>`
+- `GET /recommendations` · `POST /refresh` · `GET /health`
 
 ## Disclaimer
 
-Dies ist **keine Finanzberatung**. Technische Analyse ist ein Tool, keine Garantie.  
-Handele immer verantwortungsvoll und nach eigener Recherche.
+**Keine Finanzberatung.** Technische Analyse ist ein Werkzeug, keine Garantie.
 
 ## License
 
