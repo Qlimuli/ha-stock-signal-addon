@@ -25,6 +25,7 @@ class Element {
     this.checked = false;
   }
   addEventListener(type, fn) { this.listeners[type] = fn; }
+  querySelectorAll() { return []; }
   click() { if (this.listeners.click) this.listeners.click({ preventDefault() {} }); }
   reset() {}
 }
