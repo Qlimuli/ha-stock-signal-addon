@@ -28,6 +28,8 @@ jobs:
         run: node --check stock_signal/rootfs/app/static/app.js
       - name: Frontend startup and navigation test
         run: node tests/test_frontend.js
+      - name: Service worker syntax check
+        run: node --check stock_signal/rootfs/app/static/sw.js
       - name: Enable ARM64 container builds
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
