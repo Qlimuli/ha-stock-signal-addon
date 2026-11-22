@@ -147,6 +147,8 @@ class CycleAndMqttTests(unittest.TestCase):
     def test_mqtt_topics_are_retained(self):
         fake = Mock()
         main.mqtt_client = fake
+        main.mqtt_connected = True
+        fake.publish.return_value.rc = 0
         main.latest_signals = {"AAPL":{"signal":"long","strength":60,"confidence":70}}
         main.latest_etf_opportunities = []
         main.last_update = "2026-11-22T12:00:00+00:00"
@@ -154,6 +156,7 @@ class CycleAndMqttTests(unittest.TestCase):
         self.assertGreaterEqual(fake.publish.call_count, 6)
         self.assertTrue(all(call.kwargs.get("retain") is True for call in fake.publish.call_args_list))
         main.mqtt_client = None
+        main.mqtt_connected = False
 
 
 if __name__ == "__main__":
