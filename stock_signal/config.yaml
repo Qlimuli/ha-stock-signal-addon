@@ -1,5 +1,5 @@
 name: "Stock & ETF Signal Server"
-version: "1.5.2"
+version: "1.5.3"
 slug: stock_signal
 description: >
   Professioneller Aktien- und ETF-Signal-Server mit Aktien-Intraday- und ETF-Tagesanalyse
