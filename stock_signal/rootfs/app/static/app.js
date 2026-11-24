@@ -26,8 +26,6 @@
   let clearOpps = [];
   let market = { indices: [], mood: "unknown", summary: "" };
   let news = [];
-  let portfolio = null;
-  let recommendations = [];
   let filter = "all";
 
   function api(path, opts) {
@@ -70,17 +68,6 @@
     return map[m] || m || "-";
   }
 
-  function biasLabel(b) {
-    const map = {
-      bullish: "Aufwaerts-Bias",
-      bearish: "Abwaerts-Bias",
-      mild_bullish: "Leicht positiv",
-      mild_bearish: "Leicht negativ",
-      sideways: "Seitwaerts",
-    };
-    return map[b] || "-";
-  }
-
   function setActiveTab(name) {
     $$(".tab").forEach(function (t) {
       t.classList.toggle("active", t.dataset.tab === name);
@@ -92,50 +79,14 @@
 
   function escapeHtml(s) {
     return String(s == null ? "" : s)
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
-      .replace(/"/g, """);
+      .replace(/&/g, "\u0026amp;")
+      .replace(/</g, "\u0026lt;")
+      .replace(/>/g, "\u0026gt;")
+      .replace(/"/g, "\u0026quot;");
   }
 
   function on(el, event, fn) {
     if (el) el.addEventListener(event, fn);
-  }
-
-  console.info("[stock-signal] BASE=", BASE);
-  // Tab handlers + full UI loaded from restored complete file via second commit if truncated
-  $$(".tab").forEach(function (tab) {
-    on(tab, "click", function (ev) {
-      ev.preventDefault();
-      setActiveTab(tab.dataset.tab);
-    });
-  });
-  loadAll();
-  setInterval(loadAll, 60000);
-
-  async function loadAll() {
-    try {
-      const data = await api("signals");
-      signals = data.signals || {};
-      etfOpps = data.etf_opportunities || [];
-      clearOpps = data.clear_opportunities || [];
-      if (data.market) market = data.market;
-      news = data.news || [];
-      const lu = $("#lastUpdate");
-      if (lu) lu.textContent = "Stand: " + fmtTime(data.last_update);
-      const st = $("#apiStatus");
-      if (st) st.className = "status ok";
-      renderSummary();
-      renderMarket();
-      renderNews();
-      renderClear();
-      renderPulse();
-      renderSignals();
-    } catch (e) {
-      const st = $("#apiStatus");
-      if (st) st.className = "status err";
-      console.error("loadAll", e);
-    }
   }
 
   function renderSummary() {
@@ -224,6 +175,40 @@
     }).join("");
   }
 
+  async function loadAll() {
+    try {
+      const data = await api("signals");
+      signals = data.signals || {};
+      etfOpps = data.etf_opportunities || [];
+      clearOpps = data.clear_opportunities || [];
+      if (data.market) market = data.market;
+      news = data.news || [];
+      const lu = $("#lastUpdate");
+      if (lu) lu.textContent = "Stand: " + fmtTime(data.last_update);
+      const st = $("#apiStatus");
+      if (st) st.className = "status ok";
+      renderSummary();
+      renderMarket();
+      renderNews();
+      renderClear();
+      renderPulse();
+      renderSignals();
+    } catch (e) {
+      const st = $("#apiStatus");
+      if (st) st.className = "status err";
+      console.error("loadAll", e);
+      const box = $("#pulseGrid");
+      if (box) box.innerHTML = '<div class="empty">API-Fehler: ' + escapeHtml(e.message) + "</div>";
+    }
+  }
+
+  $$(".tab").forEach(function (tab) {
+    on(tab, "click", function (ev) {
+      ev.preventDefault();
+      setActiveTab(tab.dataset.tab);
+    });
+  });
+
   $$(".chip").forEach(function (chip) {
     on(chip, "click", function () {
       filter = chip.dataset.filter;
@@ -236,6 +221,11 @@
     try {
       await api("refresh", { method: "POST" });
       setTimeout(loadAll, 2500);
+      setTimeout(loadAll, 8000);
     } catch (e) { alert(e.message); }
   });
+
+  console.info("[stock-signal] BASE=", BASE);
+  loadAll();
+  setInterval(loadAll, 60000);
 })();
