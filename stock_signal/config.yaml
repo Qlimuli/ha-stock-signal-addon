@@ -1,11 +1,10 @@
 name: "Stock & ETF Signal Server"
-version: "1.5.4"
+version: "1.6.0"
 slug: stock_signal
 description: >
-  Professioneller Aktien- und ETF-Signal-Server mit Aktien-Intraday- und ETF-Tagesanalyse
-  (RSI, MACD, Bollinger, VWAP, Stochastic, ADX, ATR, CCI). Long/Short/Neutral, ETF-Nachkauf,
-  Portfolio mit P&L und gewichteten Empfehlungen. Web-GUI, MQTT, REST und Web-Push.
-  Scalable Capital: Depot manuell oder via MCP/HA-Integration verknüpfen.
+  Aktien- und ETF-Signal-Server: technische Analyse, Weltmarkt-Überblick, Headlines zu
+  Tagesbewegungen, nur sehr klare Kauf-/Verkaufssignale, technische Bias-Labels.
+  Portfolio, MQTT, REST, Web-GUI und Web-Push. Keine Finanzberatung.
 url: "https://github.com/Qlimuli/ha-stock-signal-addon"
 arch:
   - aarch64
