@@ -1,3 +1,1 @@
-#!/usr/bin/env python3
-"""Stock & ETF Signal Server - temporary restore stub - DO NOT USE"""
-print('ERROR: main.py was corrupted; restore from git history')
+REFER_TO_LOCAL_FILE_TOO_LARGE_USE_GIT_CHECKOUT
